@@ -1,29 +1,38 @@
 import os
 import argparse
+import getpass
+import base64
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-def generar_llave():
-    """Genera una llave de encriptación y la guarda en un archivo."""
-    llave = Fernet.generate_key()
-    with open("secret.key", "wb") as archivo_llave:
-        archivo_llave.write(llave)
-    print("[+] Llave maestra generada y guardada en 'secret.key'")
-    print("[!] ADVERTENCIA: No pierdas este archivo, o no podrás recuperar tus datos.")
-
-def cargar_llave():
-    """Carga la llave de encriptación desde el archivo."""
-    if not os.path.exists("secret.key"):
-        print("[-] Error: No se encontró 'secret.key'. Usa -g para generar una primero.")
-        exit(1)
-    return open("secret.key", "rb").read()
+def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
+    """Deriva una llave segura de 32 bytes a partir de una contraseña humana y un 'salt' aleatorio."""
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=480000, # Grado militar: hace que ataques de fuerza bruta sean lentísimos
+    )
+    # Fernet requiere que la llave esté codificada en base64
+    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def cifrar_archivo(ruta_archivo):
-    """Toma un archivo y lo encripta."""
     if not os.path.exists(ruta_archivo):
         print(f"[-] Error: El archivo '{ruta_archivo}' no existe.")
         return
 
-    llave = cargar_llave()
+    # Usamos getpass para que la contraseña no se vea en la terminal al escribirla
+    password = getpass.getpass("[?] Ingresa una contraseña maestra para cifrar: ")
+    confirmacion = getpass.getpass("[?] Confirma tu contraseña: ")
+
+    if password != confirmacion:
+        print("[-] Error: Las contraseñas no coinciden. Operación cancelada.")
+        return
+
+    # Generamos un "Salt" aleatorio de 16 bytes. Es crucial para evitar ataques de diccionario.
+    salt = os.urandom(16)
+    llave = generar_llave_desde_password(password, salt)
     f = Fernet(llave)
 
     with open(ruta_archivo, "rb") as archivo:
@@ -33,41 +42,45 @@ def cifrar_archivo(ruta_archivo):
     
     nuevo_nombre = ruta_archivo + ".enc"
     with open(nuevo_nombre, "wb") as archivo_cifrado:
-        archivo_cifrado.write(datos_cifrados)
+        # TRUCO MAESTRO: Guardamos el 'salt' en los primeros 16 bytes del archivo
+        # No es secreto, pero es necesario para que el algoritmo pueda descifrarlo después.
+        archivo_cifrado.write(salt + datos_cifrados)
     
-    # Opcional: eliminar el archivo original sin cifrar
     os.remove(ruta_archivo)
-    print(f"[+] Archivo encriptado con éxito: {nuevo_nombre}")
+    print(f"[+] Archivo cifrado con éxito: {nuevo_nombre}")
 
 def descifrar_archivo(ruta_archivo):
-    """Toma un archivo encriptado y lo restaura a su estado original."""
     if not os.path.exists(ruta_archivo) or not ruta_archivo.endswith(".enc"):
         print(f"[-] Error: Archivo inválido. Debe existir y terminar en '.enc'.")
         return
 
-    llave = cargar_llave()
-    f = Fernet(llave)
+    password = getpass.getpass("[?] Ingresa la contraseña para descifrar: ")
 
     with open(ruta_archivo, "rb") as archivo_cifrado:
-        datos_cifrados = archivo_cifrado.read()
+        contenido = archivo_cifrado.read()
+
+    # Extraemos el 'salt' (los primeros 16 bytes) y el resto son los datos cifrados
+    salt = contenido[:16]
+    datos_cifrados = contenido[16:]
+
+    llave = generar_llave_desde_password(password, salt)
+    f = Fernet(llave)
 
     try:
         datos_descifrados = f.decrypt(datos_cifrados)
     except Exception:
-        print("[-] Error crítico: La llave no coincide o el archivo está corrupto.")
+        print("[-] Acceso Denegado: Contraseña incorrecta o archivo corrupto.")
         return
 
     nombre_original = ruta_archivo.replace(".enc", "")
     with open(nombre_original, "wb") as archivo_descifrado:
         archivo_descifrado.write(datos_descifrados)
 
-    # Eliminamos la versión cifrada
     os.remove(ruta_archivo)
-    print(f"[+] Archivo desencriptado y restaurado: {nombre_original}")
+    print(f"[+] Acceso Concedido: Archivo restaurado a {nombre_original}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Crypto-Vault: Herramienta de Cifrado de Archivos AES")
-    parser.add_argument("-g", "--generar", action="store_true", help="Genera una nueva llave de encriptación (secret.key)")
+    parser = argparse.ArgumentParser(description="Crypto-Vault: Bóveda de archivos AES-256")
     parser.add_argument("-e", "--encrypt", type=str, help="Ruta del archivo a encriptar")
     parser.add_argument("-d", "--decrypt", type=str, help="Ruta del archivo a desencriptar (.enc)")
 
@@ -77,9 +90,7 @@ def main():
     print("             CRYPTO-VAULT               ")
     print("========================================")
 
-    if args.generar:
-        generar_llave()
-    elif args.encrypt:
+    if args.encrypt:
         cifrar_archivo(args.encrypt)
     elif args.decrypt:
         descifrar_archivo(args.decrypt)
