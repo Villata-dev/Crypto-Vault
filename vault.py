@@ -1,6 +1,8 @@
 import os
 import base64
 import threading
+import string
+import secrets
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -18,14 +20,14 @@ def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
-# --- INTERFAZ GRÁFICA V2.1 (CON BARRA DE PROGRESO) ---
+# --- INTERFAZ GRÁFICA V2.2 (CON GENERADOR DE CLAVES) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Advanced Security")
-        self.geometry("500x650") # Aumenté un poco el alto para la barra
+        self.geometry("500x650")
         self.resizable(False, False)
         
         ctk.set_appearance_mode("dark")
@@ -66,8 +68,15 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_sec_title = ctk.CTkLabel(self.security_frame, text="2. Credenciales de Acceso", font=ctk.CTkFont(weight="bold"))
         self.lbl_sec_title.pack(pady=(10, 5))
 
-        self.entrada_password = ctk.CTkEntry(self.security_frame, placeholder_text="Contraseña maestra", show="*", width=250, height=35)
-        self.entrada_password.pack(pady=5)
+        # Sub-contenedor para alinear el input y el botón del dado
+        self.pass_frame = ctk.CTkFrame(self.security_frame, fg_color="transparent")
+        self.pass_frame.pack(pady=5)
+
+        self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="Contraseña maestra", show="*", width=210, height=35)
+        self.entrada_password.grid(row=0, column=0, padx=(0, 5))
+
+        self.btn_generar = ctk.CTkButton(self.pass_frame, text="🎲", width=35, height=35, fg_color="#8E44AD", hover_color="#732D91", command=self.generar_password)
+        self.btn_generar.grid(row=0, column=1)
 
         self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Mostrar contraseña", font=ctk.CTkFont(size=11), command=self.toggle_password, checkbox_width=18, checkbox_height=18)
         self.chk_mostrar_pass.pack(pady=(5, 10))
@@ -82,7 +91,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_descifrar = ctk.CTkButton(self.action_frame, text="🔓 Descifrar", fg_color="#27AE60", hover_color="#1E8449", font=ctk.CTkFont(weight="bold"), width=140, height=40, command=self.iniciar_descifrado)
         self.btn_descifrar.grid(row=0, column=1, padx=10)
 
-        # --- BARRA DE PROGRESO (Oculta por defecto) ---
+        # --- BARRA DE PROGRESO ---
         self.progressbar = ctk.CTkProgressBar(self.main_frame, mode="indeterminate", width=350)
         self.progressbar.set(0)
 
@@ -91,6 +100,19 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_estado.pack(side="bottom", pady=10)
 
     # --- FUNCIONES DE LA INTERFAZ ---
+
+    def generar_password(self):
+        """Genera una contraseña criptográficamente segura de 16 caracteres"""
+        caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
+        password_segura = ''.join(secrets.choice(caracteres) for _ in range(16))
+        
+        self.entrada_password.delete(0, 'end')
+        self.entrada_password.insert(0, password_segura)
+        
+        # Activamos el checkbox y mostramos la contraseña para que el usuario pueda copiarla
+        self.chk_mostrar_pass.select()
+        self.entrada_password.configure(show="")
+        self.lbl_estado.configure(text="Estado: Clave segura generada. ¡Asegúrate de copiarla!", text_color="#F1C40F")
 
     def toggle_password(self):
         if self.chk_mostrar_pass.get() == 1:
@@ -107,22 +129,21 @@ class CryptoVaultApp(ctk.CTk):
             self.lbl_estado.configure(text="Estado: Archivo cargado en memoria.")
 
     def bloquear_ui(self, bloqueado: bool):
-        """Desactiva los botones mientras la barra de progreso se mueve"""
         estado = "disabled" if bloqueado else "normal"
         self.btn_cifrar.configure(state=estado)
         self.btn_descifrar.configure(state=estado)
         self.btn_seleccionar.configure(state=estado)
+        self.btn_generar.configure(state=estado)
 
     # --- LÓGICA DE HILOS PARA CIFRADO ---
     def iniciar_cifrado(self):
         if not self.validar_entradas(): return
         
         self.bloquear_ui(True)
-        self.progressbar.pack(pady=(0, 10)) # Mostramos la barra
-        self.progressbar.start() # Animamos la barra
+        self.progressbar.pack(pady=(0, 10))
+        self.progressbar.start()
         self.lbl_estado.configure(text="Estado: Ejecutando cifrado militar en segundo plano...", text_color="white")
         
-        # Lanzamos el trabajo pesado en un hilo separado
         threading.Thread(target=self.tarea_cifrar, args=(self.ruta_archivo, self.entrada_password.get()), daemon=True).start()
 
     def tarea_cifrar(self, ruta, password):
@@ -141,8 +162,6 @@ class CryptoVaultApp(ctk.CTk):
                 archivo_cifrado.write(salt + datos_cifrados)
             
             os.remove(ruta)
-            
-            # .after permite actualizar la UI desde un hilo secundario de forma segura
             self.after(500, self.finalizar_operacion, "Cifrado", True, "")
         except Exception as e:
             self.after(500, self.finalizar_operacion, "Cifrado", False, str(e))
@@ -181,9 +200,8 @@ class CryptoVaultApp(ctk.CTk):
             self.after(500, self.finalizar_operacion, "Descifrado", False, "Contraseña incorrecta o el archivo está corrupto.")
 
     def finalizar_operacion(self, operacion, exito, error_msg):
-        """Detiene la barra de progreso y restaura la interfaz"""
         self.progressbar.stop()
-        self.progressbar.pack_forget() # Ocultamos la barra
+        self.progressbar.pack_forget()
         self.bloquear_ui(False)
 
         if exito:
