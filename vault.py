@@ -42,7 +42,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_icono = ctk.CTkLabel(self.main_frame, text="🛡️", font=ctk.CTkFont(size=40))
         self.lbl_icono.pack(pady=(20, 5))
         
-        self.lbl_titulo = ctk.CTkLabel(self.main_frame, text="CRYPTO-VAULT", font=ctk.CTkFont(size=24, weight="bold", letter_spacing=2))
+        self.lbl_titulo = ctk.CTkLabel(self.main_frame, text="CRYPTO-VAULT", font=ctk.CTkFont(size=24, weight="bold"))
         self.lbl_titulo.pack()
         
         self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="Cifrado AES-256 PBKDF2", text_color="#7F8C8D", font=ctk.CTkFont(size=12))
