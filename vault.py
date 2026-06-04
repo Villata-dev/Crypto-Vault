@@ -20,99 +20,113 @@ def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
-# --- INTERFAZ GRÁFICA V2.2 (CON GENERADOR DE CLAVES) ---
+# --- INTERFAZ GRÁFICA V3.2 (CYBER-TERMINAL + FIX DE ESPACIADO) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Crypto-Vault | Advanced Security")
-        self.geometry("500x650")
+        self.title("Crypto-Vault | Grado Militar")
+        self.geometry("500x680")
         self.resizable(False, False)
         
+        self.configure(fg_color="#0B0E14")
         ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
 
         self.ruta_archivo = None
 
+        self.font_title = ctk.CTkFont(family="Consolas", size=26, weight="bold")
+        self.font_bold = ctk.CTkFont(family="Consolas", size=13, weight="bold")
+        self.font_mono = ctk.CTkFont(family="Consolas", size=12)
+
         # --- CONTENEDOR PRINCIPAL ---
-        self.main_frame = ctk.CTkFrame(self, corner_radius=15)
+        self.main_frame = ctk.CTkFrame(self, fg_color="#151A22", corner_radius=4, border_width=1, border_color="#2A3241")
         self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-        self.lbl_icono = ctk.CTkLabel(self.main_frame, text="🛡️", font=ctk.CTkFont(size=40))
-        self.lbl_icono.pack(pady=(20, 5))
+        # 1. CABECERA (Alineación perfecta anti-bugs de espaciado)
+        self.title_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.title_frame.pack(pady=(30, 5))
+
+        self.lbl_corchete_izq = ctk.CTkLabel(self.title_frame, text="[ ", font=self.font_title, text_color="#00E5FF")
+        self.lbl_corchete_izq.pack(side="left")
+
+        # Usamos una fuente genérica solo para el emoji para que no se rompa el espaciado
+        self.lbl_escudo = ctk.CTkLabel(self.title_frame, text="🛡️ ", font=ctk.CTkFont(size=22)) 
+        self.lbl_escudo.pack(side="left", pady=(0, 2))
         
-        self.lbl_titulo = ctk.CTkLabel(self.main_frame, text="CRYPTO-VAULT", font=ctk.CTkFont(size=24, weight="bold"))
-        self.lbl_titulo.pack()
+        self.lbl_texto = ctk.CTkLabel(self.title_frame, text="CRYPTO-VAULT", font=self.font_title, text_color="#00E5FF")
+        self.lbl_texto.pack(side="left")
+
+        self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
+        self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="Cifrado AES-256 PBKDF2", text_color="#7F8C8D", font=ctk.CTkFont(size=12))
-        self.lbl_subtitulo.pack(pady=(0, 20))
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // PBKDF2", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo.pack(pady=(0, 25))
 
         # --- SECCIÓN DE ARCHIVO ---
-        self.file_frame = ctk.CTkFrame(self.main_frame, fg_color="#2C3E50", corner_radius=10)
+        self.file_frame = ctk.CTkFrame(self.main_frame, fg_color="#1E2430", corner_radius=2)
         self.file_frame.pack(pady=10, padx=20, fill="x")
 
-        self.lbl_file_title = ctk.CTkLabel(self.file_frame, text="1. Selección de Archivo", font=ctk.CTkFont(weight="bold"))
-        self.lbl_file_title.pack(pady=(10, 5))
+        self.lbl_file_title = ctk.CTkLabel(self.file_frame, text="[ TARGET FILE ]", font=self.font_bold, text_color="#8B9BB4")
+        self.lbl_file_title.pack(pady=(15, 5))
 
-        self.btn_seleccionar = ctk.CTkButton(self.file_frame, text="📂 Explorar Sistema...", command=self.seleccionar_archivo, fg_color="#2980B9", hover_color="#1A5276")
-        self.btn_seleccionar.pack(pady=5)
+        self.btn_seleccionar = ctk.CTkButton(self.file_frame, text="Explorar Directorio", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#3B82F6", text_color="#3B82F6", hover_color="#1E3A8A", corner_radius=2, command=self.seleccionar_archivo)
+        self.btn_seleccionar.pack(pady=10)
 
-        self.lbl_archivo = ctk.CTkLabel(self.file_frame, text="Ningún archivo seleccionado", text_color="#BDC3C7", wraplength=400, font=ctk.CTkFont(slant="italic"))
-        self.lbl_archivo.pack(pady=(5, 10))
+        self.lbl_archivo = ctk.CTkLabel(self.file_frame, text=">_ Esperando archivo...", text_color="#4B5563", font=self.font_mono, wraplength=400)
+        self.lbl_archivo.pack(pady=(0, 15))
 
         # --- SECCIÓN DE SEGURIDAD ---
-        self.security_frame = ctk.CTkFrame(self.main_frame, fg_color="#2C3E50", corner_radius=10)
+        self.security_frame = ctk.CTkFrame(self.main_frame, fg_color="#1E2430", corner_radius=2)
         self.security_frame.pack(pady=10, padx=20, fill="x")
 
-        self.lbl_sec_title = ctk.CTkLabel(self.security_frame, text="2. Credenciales de Acceso", font=ctk.CTkFont(weight="bold"))
-        self.lbl_sec_title.pack(pady=(10, 5))
+        self.lbl_sec_title = ctk.CTkLabel(self.security_frame, text="[ SECURITY KEY ]", font=self.font_bold, text_color="#8B9BB4")
+        self.lbl_sec_title.pack(pady=(15, 5))
 
-        # Sub-contenedor para alinear el input y el botón del dado
         self.pass_frame = ctk.CTkFrame(self.security_frame, fg_color="transparent")
         self.pass_frame.pack(pady=5)
 
-        self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="Contraseña maestra", show="*", width=210, height=35)
-        self.entrada_password.grid(row=0, column=0, padx=(0, 5))
+        self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="Ingresa master_key", show="*", width=200, height=35, font=self.font_mono, fg_color="#0F1219", border_color="#374151", corner_radius=2)
+        self.entrada_password.grid(row=0, column=0, padx=(0, 10))
 
-        self.btn_generar = ctk.CTkButton(self.pass_frame, text="🎲", width=35, height=35, fg_color="#8E44AD", hover_color="#732D91", command=self.generar_password)
+        self.btn_generar = ctk.CTkButton(self.pass_frame, text="⚡ Generar", width=90, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, command=self.generar_password)
         self.btn_generar.grid(row=0, column=1)
 
-        self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Mostrar contraseña", font=ctk.CTkFont(size=11), command=self.toggle_password, checkbox_width=18, checkbox_height=18)
-        self.chk_mostrar_pass.pack(pady=(5, 10))
+        self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Visibilidad", font=self.font_mono, text_color="#9CA3AF", fg_color="#00E5FF", hover_color="#00B3CC", corner_radius=2, checkbox_width=16, checkbox_height=16, border_width=1, command=self.toggle_password)
+        self.chk_mostrar_pass.pack(pady=(10, 15))
 
-        # --- SECCIÓN DE ACCIÓN ---
+        # --- SECCIÓN DE ACCIÓN (Botones Ghost/Outline) ---
         self.action_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.action_frame.pack(pady=20)
+        self.action_frame.pack(pady=25)
 
-        self.btn_cifrar = ctk.CTkButton(self.action_frame, text="🔒 Cifrar", fg_color="#C0392B", hover_color="#922B21", font=ctk.CTkFont(weight="bold"), width=140, height=40, command=self.iniciar_cifrado)
+        # Botón Encriptar
+        self.btn_cifrar = ctk.CTkButton(self.action_frame, text="[ 🔒 ENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#EF4444", text_color="#EF4444", hover_color="#7F1D1D", font=self.font_bold, width=150, height=42, corner_radius=2, command=self.iniciar_cifrado)
         self.btn_cifrar.grid(row=0, column=0, padx=10)
 
-        self.btn_descifrar = ctk.CTkButton(self.action_frame, text="🔓 Descifrar", fg_color="#27AE60", hover_color="#1E8449", font=ctk.CTkFont(weight="bold"), width=140, height=40, command=self.iniciar_descifrado)
+        # Botón Desencriptar
+        self.btn_descifrar = ctk.CTkButton(self.action_frame, text="[ 🔓 DESENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", font=self.font_bold, width=150, height=42, corner_radius=2, command=self.iniciar_descifrado)
         self.btn_descifrar.grid(row=0, column=1, padx=10)
 
         # --- BARRA DE PROGRESO ---
-        self.progressbar = ctk.CTkProgressBar(self.main_frame, mode="indeterminate", width=350)
+        self.progressbar = ctk.CTkProgressBar(self.main_frame, mode="indeterminate", width=350, progress_color="#00E5FF", fg_color="#1E2430")
         self.progressbar.set(0)
 
         # --- BARRA DE ESTADO ---
-        self.lbl_estado = ctk.CTkLabel(self, text="Estado: Esperando acción...", text_color="gray", font=ctk.CTkFont(size=11))
-        self.lbl_estado.pack(side="bottom", pady=10)
+        self.lbl_estado = ctk.CTkLabel(self, text="SYS_STATUS: INACTIVO", text_color="#4B5563", font=self.font_mono)
+        self.lbl_estado.pack(side="bottom", pady=15)
 
     # --- FUNCIONES DE LA INTERFAZ ---
 
     def generar_password(self):
-        """Genera una contraseña criptográficamente segura de 16 caracteres"""
         caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
         password_segura = ''.join(secrets.choice(caracteres) for _ in range(16))
         
         self.entrada_password.delete(0, 'end')
         self.entrada_password.insert(0, password_segura)
         
-        # Activamos el checkbox y mostramos la contraseña para que el usuario pueda copiarla
         self.chk_mostrar_pass.select()
         self.entrada_password.configure(show="")
-        self.lbl_estado.configure(text="Estado: Clave segura generada. ¡Asegúrate de copiarla!", text_color="#F1C40F")
+        self.lbl_estado.configure(text="SYS_STATUS: KEY GENERADA. GUARDAR EN LUGAR SEGURO.", text_color="#F59E0B")
 
     def toggle_password(self):
         if self.chk_mostrar_pass.get() == 1:
@@ -121,12 +135,12 @@ class CryptoVaultApp(ctk.CTk):
             self.entrada_password.configure(show="*")
 
     def seleccionar_archivo(self):
-        ruta = filedialog.askopenfilename(title="Selecciona un archivo")
+        ruta = filedialog.askopenfilename(title="Selecciona un archivo target")
         if ruta:
             self.ruta_archivo = ruta
             nombre_corto = os.path.basename(ruta)
-            self.lbl_archivo.configure(text=nombre_corto, text_color="#F1C40F")
-            self.lbl_estado.configure(text="Estado: Archivo cargado en memoria.")
+            self.lbl_archivo.configure(text=f">_ {nombre_corto}", text_color="#00E5FF")
+            self.lbl_estado.configure(text="SYS_STATUS: TARGET ADQUIRIDO.")
 
     def bloquear_ui(self, bloqueado: bool):
         estado = "disabled" if bloqueado else "normal"
@@ -140,9 +154,9 @@ class CryptoVaultApp(ctk.CTk):
         if not self.validar_entradas(): return
         
         self.bloquear_ui(True)
-        self.progressbar.pack(pady=(0, 10))
+        self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="Estado: Ejecutando cifrado militar en segundo plano...", text_color="white")
+        self.lbl_estado.configure(text="SYS_STATUS: ENCRIPTANDO DATOS...", text_color="#00E5FF")
         
         threading.Thread(target=self.tarea_cifrar, args=(self.ruta_archivo, self.entrada_password.get()), daemon=True).start()
 
@@ -162,18 +176,18 @@ class CryptoVaultApp(ctk.CTk):
                 archivo_cifrado.write(salt + datos_cifrados)
             
             os.remove(ruta)
-            self.after(500, self.finalizar_operacion, "Cifrado", True, "")
+            self.after(500, self.finalizar_operacion, "ENCRIPTADO", True, "")
         except Exception as e:
-            self.after(500, self.finalizar_operacion, "Cifrado", False, str(e))
+            self.after(500, self.finalizar_operacion, "ERROR", False, str(e))
 
     # --- LÓGICA DE HILOS PARA DESCIFRADO ---
     def iniciar_descifrado(self):
         if not self.validar_entradas(es_descifrado=True): return
 
         self.bloquear_ui(True)
-        self.progressbar.pack(pady=(0, 10))
+        self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="Estado: Validando credenciales y descifrando...", text_color="white")
+        self.lbl_estado.configure(text="SYS_STATUS: VALIDANDO CREDENCIALES...", text_color="#00E5FF")
 
         threading.Thread(target=self.tarea_descifrar, args=(self.ruta_archivo, self.entrada_password.get()), daemon=True).start()
 
@@ -195,9 +209,9 @@ class CryptoVaultApp(ctk.CTk):
                 archivo_descifrado.write(datos_descifrados)
 
             os.remove(ruta)
-            self.after(500, self.finalizar_operacion, "Descifrado", True, "")
+            self.after(500, self.finalizar_operacion, "DESENCRIPTADO", True, "")
         except Exception:
-            self.after(500, self.finalizar_operacion, "Descifrado", False, "Contraseña incorrecta o el archivo está corrupto.")
+            self.after(500, self.finalizar_operacion, "ERROR", False, "ACCESO DENEGADO: Clave incorrecta.")
 
     def finalizar_operacion(self, operacion, exito, error_msg):
         self.progressbar.stop()
@@ -206,27 +220,27 @@ class CryptoVaultApp(ctk.CTk):
 
         if exito:
             self.limpiar_ui()
-            self.lbl_estado.configure(text=f"Estado: Archivo {operacion.lower()} exitosamente.", text_color="#27AE60")
-            messagebox.showinfo("Operación Exitosa", f"El archivo ha sido {operacion.lower()} con éxito.")
+            self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
+            messagebox.showinfo("SYS_MSG", f"Operación completada: Archivo {operacion.lower()}.")
         else:
-            self.lbl_estado.configure(text="Estado: Error crítico / Acceso denegado.", text_color="#C0392B")
-            messagebox.showerror("Error", error_msg)
+            self.lbl_estado.configure(text="SYS_STATUS: ACCESO DENEGADO / CORRUPCIÓN", text_color="#DC2626")
+            messagebox.showerror("SYS_ERR", error_msg)
 
     def validar_entradas(self, es_descifrado=False):
         if not self.ruta_archivo:
-            messagebox.showwarning("Aviso", "Selecciona un archivo primero.")
+            messagebox.showwarning("SYS_WARN", "Target no seleccionado.")
             return False
         if es_descifrado and not self.ruta_archivo.endswith(".enc"):
-            messagebox.showerror("Error", "Debes seleccionar un archivo cifrado (.enc).")
+            messagebox.showerror("SYS_ERR", "Formato inválido. Se requiere archivo .enc")
             return False
         if not self.entrada_password.get():
-            messagebox.showwarning("Aviso", "Ingresa una contraseña maestra.")
+            messagebox.showwarning("SYS_WARN", "Se requiere master_key.")
             return False
         return True
 
     def limpiar_ui(self):
         self.ruta_archivo = None
-        self.lbl_archivo.configure(text="Ningún archivo seleccionado", text_color="#BDC3C7")
+        self.lbl_archivo.configure(text=">_ Esperando archivo...", text_color="#4B5563")
         self.entrada_password.delete(0, 'end')
         self.chk_mostrar_pass.deselect()
         self.entrada_password.configure(show="*")
