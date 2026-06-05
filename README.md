@@ -1,44 +1,31 @@
-# 🛡️ Crypto Vault
+# 🛡️ CRYPTO-VAULT
 
-Crypto Vault es una aplicación de escritorio para cifrar y descifrar archivos de forma local utilizando algoritmos criptográficos modernos. Su objetivo es proteger documentos, imágenes y cualquier tipo de archivo mediante una contraseña maestra, evitando que terceros puedan acceder a su contenido.
+**Motor de encriptación local con interfaz gráfica (GUI) de grado militar.**
 
-## Características
-
-### 🔐 Cifrado AES-256
-
-Utiliza la librería `cryptography` de Python para aplicar cifrado simétrico AES-256 sobre los archivos seleccionados, garantizando un alto nivel de seguridad.
-
-### 🔑 Derivación segura de claves
-
-La contraseña ingresada por el usuario no se usa directamente como clave de cifrado. En su lugar, se genera una clave mediante PBKDF2-HMAC con SHA-256, un salt aleatorio y 480.000 iteraciones, dificultando ataques de fuerza bruta o diccionario.
-
-### 🎨 Interfaz gráfica
-
-La aplicación cuenta con una interfaz desarrollada con `CustomTkinter`, incluyendo:
-
-* Modo oscuro.
-* Selección de archivos mediante explorador.
-* Mensajes de estado y confirmación.
-* Manejo de errores mediante ventanas emergentes.
-
-### 🗑️ Eliminación del archivo original
-
-Una vez completado el proceso de cifrado o descifrado, el archivo original es eliminado para reducir el riesgo de exposición accidental de información.
+Crypto-Vault es una herramienta diseñada para asegurar archivos confidenciales (*targets*) mediante cifrado simétrico avanzado, protegiendo la información contra accesos no autorizados en entornos locales.
 
 ---
 
-## Requisitos
+## ⚙️ ESPECIFICACIONES TÉCNICAS
 
-* Python 3.10 o superior
-* Dependencias:
+* **Algoritmo Core:** `AES-256` (*Advanced Encryption Standard*), operando a través de la librería criptográfica nativa de Python.
+* **Derivación de Claves (KDF):** Implementa `PBKDF2HMAC` utilizando `SHA-256`.
+* **Resistencia Brute-Force:** 480.000 iteraciones automáticas combinadas con la inyección de un *salt* criptográfico aleatorio de 16 bytes por cada archivo.
+* **Arquitectura GUI:** Construida sobre `CustomTkinter`, utilizando manejo de hilos (*threading*) asíncronos para aislar el motor matemático de la interfaz visual, previniendo cuelgues del sistema durante el procesamiento de *payloads* pesados.
+
+---
+
+## 📦 DESPLIEGUE E INSTALACIÓN
+
+### Dependencias del entorno
+
+Requiere **Python 3.8** o superior.
 
 ```bash
 pip install cryptography customtkinter
 ```
 
-## Instalación
-
-Clona el repositorio y accede al directorio del proyecto:
+### Clonado del repositorio
 
 ```bash
 git clone https://github.com/tu-usuario/crypto-vault.git
@@ -47,63 +34,29 @@ cd crypto-vault
 
 ---
 
-## Ejecución
+## 🚀 MANUAL DE OPERACIÓN
 
-Para iniciar la aplicación:
+### Ejecución del entorno visual
 
 ```bash
 python vault.py
 ```
 
----
+### Flujo de Encriptación / Desencriptación
 
-## Cómo usarlo
-
-### 1. Selecciona un archivo
-
-Haz clic en **Seleccionar Archivo** y elige el archivo que deseas cifrar o descifrar.
-
-### 2. Ingresa una contraseña
-
-Escribe una contraseña segura. Esta contraseña será necesaria para recuperar el archivo posteriormente.
-
-> Importante: si la contraseña se pierde, el archivo cifrado no podrá recuperarse.
-
-### 3. Cifra o descifra
-
-**Cifrar**
-
-* Selecciona cualquier archivo.
-* Presiona **Cifrar**.
-* Se generará una versión con extensión `.enc`.
-
-**Descifrar**
-
-* Selecciona un archivo `.enc`.
-* Introduce la contraseña utilizada durante el cifrado.
-* Presiona **Descifrar** para restaurar el archivo original.
+1. **Target:** Selecciona el archivo objetivo desde el directorio del sistema.
+2. **Master Key:** Ingresa tu credencial de acceso o utiliza el generador interno (**⚡ Generar**) para crear un token seguro de 16 caracteres.
+3. **Ejecución:** Inicia el proceso. El sistema destruirá el archivo original (`os.remove`) y generará un artefacto seguro con extensión `.enc`.
 
 ---
 
-## Consideraciones de seguridad
-
-* Las contraseñas nunca se almacenan.
-* El salt criptográfico se genera automáticamente y se incorpora dentro del archivo cifrado.
-* No existe ningún mecanismo de recuperación de contraseñas.
-* Si la contraseña es incorrecta o se pierde, el contenido cifrado será inaccesible.
-
----
-
-## Tecnologías utilizadas
-
-* Python
-* Cryptography
-* CustomTkinter
-* AES-256
-* PBKDF2-HMAC (SHA-256)
+> [!WARNING]
+> **CRITICAL DATA LOSS**
+>
+> La arquitectura de Crypto-Vault opera bajo políticas de **Zero-Knowledge**. El *salt* se incrusta en el archivo cifrado, pero la contraseña **no se almacena en ninguna parte del sistema**.
+>
+> La pérdida de la **master key** implica la pérdida irreversible del archivo.
 
 ---
 
-## Licencia
-
-Proyecto desarrollado con fines educativos y de aprendizaje sobre criptografía aplicada en Python.
+**Desarrollado y mantenido para entornos locales de alta privacidad.**
