@@ -9,7 +9,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-# --- LÓGICA CRIPTOGRÁFICA ---
+# --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
 
 def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -20,7 +20,22 @@ def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
-# --- INTERFAZ GRÁFICA V4.0 (CYBER-TERMINAL + CIFRADO MASIVO) ---
+def borrado_seguro(ruta_archivo, pases=3):
+    """Sobrescribe el archivo con ruido estático antes de eliminarlo (Shredding)"""
+    try:
+        tamano = os.path.getsize(ruta_archivo)
+        with open(ruta_archivo, "r+b") as archivo:
+            for _ in range(pases):
+                archivo.seek(0)
+                # Inyectamos bytes aleatorios del mismo tamaño del archivo original
+                archivo.write(os.urandom(tamano))
+        os.remove(ruta_archivo)
+    except Exception:
+        # Fallback de emergencia por si hay conflictos de permisos en Windows
+        if os.path.exists(ruta_archivo):
+            os.remove(ruta_archivo)
+
+# --- INTERFAZ GRÁFICA V4.1 (CYBER-TERMINAL + SHREDDER) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -60,7 +75,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // BATCH PROCESSING", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // DATA SHREDDING", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 25))
 
         # --- SECCIÓN DE ARCHIVO / CARPETA ---
@@ -70,7 +85,6 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_file_title = ctk.CTkLabel(self.file_frame, text="[ TARGET SELECTION ]", font=self.font_bold, text_color="#8B9BB4")
         self.lbl_file_title.pack(pady=(15, 5))
 
-        # Sub-contenedor para los dos botones de selección
         self.btn_select_frame = ctk.CTkFrame(self.file_frame, fg_color="transparent")
         self.btn_select_frame.pack(pady=10)
 
@@ -161,7 +175,6 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_generar.configure(state=estado)
 
     def obtener_lista_archivos(self, es_descifrado=False):
-        """Genera una lista de rutas absolutas a procesar"""
         archivos_a_procesar = []
         if not self.es_carpeta:
             archivos_a_procesar.append(self.ruta_target)
@@ -169,7 +182,6 @@ class CryptoVaultApp(ctk.CTk):
             for raiz, _, archivos in os.walk(self.ruta_target):
                 for arch in archivos:
                     ruta_completa = os.path.join(raiz, arch)
-                    # Si encriptamos, ignoramos los ya encriptados. Si desencriptamos, tomamos SOLO los encriptados.
                     if es_descifrado:
                         if ruta_completa.endswith(".enc"):
                             archivos_a_procesar.append(ruta_completa)
@@ -184,7 +196,7 @@ class CryptoVaultApp(ctk.CTk):
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: ENCRIPTANDO BATCH DATA...", text_color="#00E5FF")
+        self.lbl_estado.configure(text="SYS_STATUS: ENCRIPTANDO Y DESTRUYENDO ORIGINALES...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_cifrar_batch, args=(self.entrada_password.get(),), daemon=True).start()
 
     def tarea_cifrar_batch(self, password):
@@ -207,7 +219,8 @@ class CryptoVaultApp(ctk.CTk):
                 with open(nuevo_nombre, "wb") as archivo_cifrado:
                     archivo_cifrado.write(salt + datos_cifrados)
                 
-                os.remove(ruta)
+                # APLICAMOS BORRADO SEGURO
+                borrado_seguro(ruta)
             
             self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
         except Exception as e:
@@ -246,12 +259,13 @@ class CryptoVaultApp(ctk.CTk):
                     with open(nombre_original, "wb") as archivo_descifrado:
                         archivo_descifrado.write(datos_descifrados)
 
-                    os.remove(ruta)
+                    # APLICAMOS BORRADO SEGURO AL .ENC
+                    borrado_seguro(ruta)
                 except Exception:
-                    errores += 1 # Contabilizamos si alguna contraseña no coincide
+                    errores += 1
             
             if errores > 0:
-                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso terminado, pero {errores} archivos fallaron (Clave incorrecta o corruptos).")
+                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso terminado. {errores} archivos fallaron.")
             else:
                 self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
         except Exception as e:
