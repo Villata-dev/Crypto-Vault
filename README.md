@@ -12,6 +12,7 @@ Crypto-Vault es una herramienta diseñada para asegurar archivos confidenciales 
 - **Derivación de Claves (KDF):** Implementa `PBKDF2HMAC` utilizando `SHA-256` con 480,000 iteraciones automáticas y *salt* aleatorio.
 - **Procesamiento Masivo (V4.0):** Integración de `os.walk` para el escaneo y encriptación recursiva de directorios completos de forma simultánea.
 - **Arquitectura GUI:** Construida sobre `CustomTkinter` utilizando manejo de hilos (*threading*) asíncronos para aislar el motor matemático de la interfaz visual.
+- **Borrado Forense (Shredding): Antes de eliminar los archivos originales o descifrados, el sistema sobrescribe el espacio en disco con ruido estático (bytes aleatorios), haciendo imposible su recuperación mediante software forense
 
 ---
 
