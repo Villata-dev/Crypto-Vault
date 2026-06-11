@@ -3,11 +3,20 @@ import base64
 import threading
 import string
 import secrets
+import logging
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# --- CONFIGURACIÓN DEL SISTEMA DE LOGS ---
+logging.basicConfig(
+    filename="vault_history.log", 
+    level=logging.INFO, 
+    format="%(asctime)s | [%(levelname)s] | %(message)s", 
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
 
@@ -21,21 +30,18 @@ def generar_llave_desde_password(password: str, salt: bytes) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def borrado_seguro(ruta_archivo, pases=3):
-    """Sobrescribe el archivo con ruido estático antes de eliminarlo (Shredding)"""
     try:
         tamano = os.path.getsize(ruta_archivo)
         with open(ruta_archivo, "r+b") as archivo:
             for _ in range(pases):
                 archivo.seek(0)
-                # Inyectamos bytes aleatorios del mismo tamaño del archivo original
                 archivo.write(os.urandom(tamano))
         os.remove(ruta_archivo)
     except Exception:
-        # Fallback de emergencia por si hay conflictos de permisos en Windows
         if os.path.exists(ruta_archivo):
             os.remove(ruta_archivo)
 
-# --- INTERFAZ GRÁFICA V4.1 (CYBER-TERMINAL + SHREDDER) ---
+# --- INTERFAZ GRÁFICA V4.2 (CYBER-TERMINAL + SHREDDER + LOGS) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -75,7 +81,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // DATA SHREDDING", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // AUDIT LOGGING", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 25))
 
         # --- SECCIÓN DE ARCHIVO / CARPETA ---
@@ -144,6 +150,7 @@ class CryptoVaultApp(ctk.CTk):
         self.chk_mostrar_pass.select()
         self.entrada_password.configure(show="")
         self.lbl_estado.configure(text="SYS_STATUS: KEY GENERADA. GUARDAR EN LUGAR SEGURO.", text_color="#F59E0B")
+        logging.info("Clave segura generada mediante el generador interno.")
 
     def toggle_password(self):
         if self.chk_mostrar_pass.get() == 1:
@@ -219,12 +226,11 @@ class CryptoVaultApp(ctk.CTk):
                 with open(nuevo_nombre, "wb") as archivo_cifrado:
                     archivo_cifrado.write(salt + datos_cifrados)
                 
-                # APLICAMOS BORRADO SEGURO
                 borrado_seguro(ruta)
             
             self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
         except Exception as e:
-            self.after(500, self.finalizar_operacion, "ERROR BATCH", False, str(e))
+            self.after(500, self.finalizar_operacion, "ERROR BATCH ENCRIPTACION", False, str(e))
 
     # --- LÓGICA BATCH PARA DESCIFRADO ---
     def iniciar_descifrado(self):
@@ -259,28 +265,31 @@ class CryptoVaultApp(ctk.CTk):
                     with open(nombre_original, "wb") as archivo_descifrado:
                         archivo_descifrado.write(datos_descifrados)
 
-                    # APLICAMOS BORRADO SEGURO AL .ENC
                     borrado_seguro(ruta)
                 except Exception:
                     errores += 1
             
             if errores > 0:
-                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso terminado. {errores} archivos fallaron.")
+                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso terminado. {errores} archivos fallaron (Clave incorrecta/Corruptos).")
             else:
                 self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
         except Exception as e:
-            self.after(500, self.finalizar_operacion, "ERROR BATCH", False, str(e))
+            self.after(500, self.finalizar_operacion, "ERROR BATCH DESENCRIPTACION", False, str(e))
 
     def finalizar_operacion(self, operacion, exito, error_msg):
         self.progressbar.stop()
         self.progressbar.pack_forget()
         self.bloquear_ui(False)
+        
+        target_registrado = self.ruta_target
 
         if exito:
+            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | Estado: EXITO")
             self.limpiar_ui()
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
             messagebox.showinfo("SYS_MSG", f"Operación Batch completada: {operacion}.")
         else:
+            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | Estado: FALLIDO | Causa: {error_msg}")
             self.lbl_estado.configure(text="SYS_STATUS: ADVERTENCIA / ERROR BATCH", text_color="#DC2626")
             messagebox.showerror("SYS_ERR", error_msg)
 
