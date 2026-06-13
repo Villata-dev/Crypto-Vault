@@ -18,12 +18,14 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
+# Separador binario inconfundible para detectar la esteganografía
+STEGO_SEPARATOR = b"||CV_STEGO_PAYLOAD||"
+
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
 
 def generar_llave_desde_password(password: str, salt: bytes, ruta_keyfile: str = None) -> bytes:
     material_base = password.encode()
     
-    # Si hay un keyfile, leemos sus primeros 64KB y los fusionamos con la contraseña
     if ruta_keyfile and os.path.exists(ruta_keyfile):
         try:
             with open(ruta_keyfile, "rb") as f:
@@ -52,14 +54,14 @@ def borrado_seguro(ruta_archivo, pases=3):
         if os.path.exists(ruta_archivo):
             os.remove(ruta_archivo)
 
-# --- INTERFAZ GRÁFICA V5.0 (CYBER-TERMINAL + KEYFILE 2FA) ---
+# --- INTERFAZ GRÁFICA V6.0 (CYBER-TERMINAL + STEGO) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Grado Militar")
-        self.geometry("500x750") # Un poco más alto para el nuevo botón
+        self.geometry("500x800")
         self.resizable(False, False)
         
         self.configure(fg_color="#0B0E14")
@@ -67,6 +69,7 @@ class CryptoVaultApp(ctk.CTk):
 
         self.ruta_target = None
         self.ruta_keyfile = None
+        self.ruta_portador = None
         self.es_carpeta = False
 
         self.font_title = ctk.CTkFont(family="Consolas", size=26, weight="bold")
@@ -93,7 +96,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // MULTI-FACTOR AUTH", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // STEGANOGRAPHY ENABLED", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 15))
 
         # --- SECCIÓN DE ARCHIVO / CARPETA (TARGET) ---
@@ -115,11 +118,11 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_archivo = ctk.CTkLabel(self.file_frame, text=">_ Esperando target...", text_color="#4B5563", font=self.font_mono, wraplength=400)
         self.lbl_archivo.pack(pady=(0, 10))
 
-        # --- SECCIÓN DE SEGURIDAD (PASSWORD + KEYFILE) ---
+        # --- SECCIÓN DE SEGURIDAD Y CAMUFLAJE ---
         self.security_frame = ctk.CTkFrame(self.main_frame, fg_color="#1E2430", corner_radius=2)
         self.security_frame.pack(pady=5, padx=20, fill="x")
 
-        self.lbl_sec_title = ctk.CTkLabel(self.security_frame, text="[ SECURITY CREDENTIALS ]", font=self.font_bold, text_color="#8B9BB4")
+        self.lbl_sec_title = ctk.CTkLabel(self.security_frame, text="[ CREDENTIALS & STEGO ]", font=self.font_bold, text_color="#8B9BB4")
         self.lbl_sec_title.pack(pady=(10, 5))
 
         self.pass_frame = ctk.CTkFrame(self.security_frame, fg_color="transparent")
@@ -134,12 +137,18 @@ class CryptoVaultApp(ctk.CTk):
         self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Visibilidad", font=self.font_mono, text_color="#9CA3AF", fg_color="#00E5FF", hover_color="#00B3CC", corner_radius=2, checkbox_width=16, checkbox_height=16, border_width=1, command=self.toggle_password)
         self.chk_mostrar_pass.pack(pady=(5, 5))
 
-        # NUEVO: Botón para Keyfile 2FA
-        self.btn_keyfile = ctk.CTkButton(self.security_frame, text="🔑 Adjuntar Keyfile (Opcional)", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#F59E0B", text_color="#F59E0B", hover_color="#B45309", corner_radius=2, width=200, command=self.seleccionar_keyfile)
-        self.btn_keyfile.pack(pady=5)
+        # Botones de 2FA y Esteganografía
+        self.tools_frame = ctk.CTkFrame(self.security_frame, fg_color="transparent")
+        self.tools_frame.pack(pady=5)
+
+        self.btn_keyfile = ctk.CTkButton(self.tools_frame, text="🔑 Keyfile", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#F59E0B", text_color="#F59E0B", hover_color="#B45309", corner_radius=2, width=120, command=self.seleccionar_keyfile)
+        self.btn_keyfile.grid(row=0, column=0, padx=5)
+
+        self.btn_portador = ctk.CTkButton(self.tools_frame, text="🖼️ Portador", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#EC4899", text_color="#EC4899", hover_color="#BE185D", corner_radius=2, width=120, command=self.seleccionar_portador)
+        self.btn_portador.grid(row=0, column=1, padx=5)
         
-        self.lbl_keyfile = ctk.CTkLabel(self.security_frame, text="[ 2FA: INACTIVO ]", text_color="#4B5563", font=self.font_mono, wraplength=400)
-        self.lbl_keyfile.pack(pady=(0, 10))
+        self.lbl_status_avanzado = ctk.CTkLabel(self.security_frame, text="[ 2FA: OFF ] | [ STEGO: OFF ]", text_color="#4B5563", font=self.font_mono, wraplength=400)
+        self.lbl_status_avanzado.pack(pady=(0, 10))
 
         # --- SECCIÓN DE ACCIÓN ---
         self.action_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
@@ -161,13 +170,23 @@ class CryptoVaultApp(ctk.CTk):
 
     # --- FUNCIONES DE LA INTERFAZ ---
 
+    def actualizar_status_avanzado(self):
+        kf_status = "ON" if self.ruta_keyfile else "OFF"
+        st_status = "ON" if self.ruta_portador else "OFF"
+        color = "#F59E0B" if (self.ruta_keyfile or self.ruta_portador) else "#4B5563"
+        self.lbl_status_avanzado.configure(text=f"[ 2FA: {kf_status} ] | [ STEGO: {st_status} ]", text_color=color)
+
     def seleccionar_keyfile(self):
-        ruta = filedialog.askopenfilename(title="Selecciona un archivo como llave física (Keyfile)")
+        ruta = filedialog.askopenfilename(title="Selecciona un archivo como llave (Keyfile)")
         if ruta:
             self.ruta_keyfile = ruta
-            nombre_corto = os.path.basename(ruta)
-            self.lbl_keyfile.configure(text=f"[ 2FA ACTIVO: {nombre_corto} ]", text_color="#F59E0B")
-            self.lbl_estado.configure(text="SYS_STATUS: MULTI-FACTOR AUTH ACTIVADO.")
+            self.actualizar_status_avanzado()
+
+    def seleccionar_portador(self):
+        ruta = filedialog.askopenfilename(title="Selecciona una imagen Portadora (JPG/PNG)", filetypes=[("Imágenes", "*.jpg *.jpeg *.png")])
+        if ruta:
+            self.ruta_portador = ruta
+            self.actualizar_status_avanzado()
 
     def generar_password(self):
         caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
@@ -177,7 +196,6 @@ class CryptoVaultApp(ctk.CTk):
         self.chk_mostrar_pass.select()
         self.entrada_password.configure(show="")
         self.lbl_estado.configure(text="SYS_STATUS: KEY GENERADA. GUARDAR EN LUGAR SEGURO.", text_color="#F59E0B")
-        logging.info("Clave segura generada mediante el generador interno.")
 
     def toggle_password(self):
         if self.chk_mostrar_pass.get() == 1:
@@ -208,6 +226,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_sel_carpeta.configure(state=estado)
         self.btn_generar.configure(state=estado)
         self.btn_keyfile.configure(state=estado)
+        self.btn_portador.configure(state=estado)
 
     def obtener_lista_archivos(self, es_descifrado=False):
         archivos_a_procesar = []
@@ -218,23 +237,24 @@ class CryptoVaultApp(ctk.CTk):
                 for arch in archivos:
                     ruta_completa = os.path.join(raiz, arch)
                     if es_descifrado:
-                        if ruta_completa.endswith(".enc"):
+                        # Para descifrar, buscamos .enc O imágenes que puedan ser portadoras
+                        if ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
                     else:
-                        if not ruta_completa.endswith(".enc"):
+                        if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
 
-    # --- LÓGICA BATCH PARA CIFRADO ---
+    # --- LÓGICA BATCH PARA CIFRADO (CON STEGO) ---
     def iniciar_cifrado(self):
         if not self.validar_entradas(): return
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: ENCRIPTANDO (MULTI-FACTOR)...", text_color="#00E5FF")
-        threading.Thread(target=self.tarea_cifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile), daemon=True).start()
+        self.lbl_estado.configure(text="SYS_STATUS: PROCESANDO DATOS...", text_color="#00E5FF")
+        threading.Thread(target=self.tarea_cifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile, self.ruta_portador), daemon=True).start()
 
-    def tarea_cifrar_batch(self, password, keyfile):
+    def tarea_cifrar_batch(self, password, keyfile, portador):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=False)
             if not archivos:
@@ -242,7 +262,6 @@ class CryptoVaultApp(ctk.CTk):
 
             for ruta in archivos:
                 salt = os.urandom(16)
-                # Ahora pasamos el keyfile al generador de llaves
                 llave = generar_llave_desde_password(password, salt, keyfile)
                 f = Fernet(llave)
 
@@ -250,61 +269,80 @@ class CryptoVaultApp(ctk.CTk):
                     datos_originales = archivo.read()
 
                 datos_cifrados = f.encrypt(datos_originales)
-                nuevo_nombre = ruta + ".enc"
-                
-                with open(nuevo_nombre, "wb") as archivo_cifrado:
-                    archivo_cifrado.write(salt + datos_cifrados)
+                payload_seguro = salt + datos_cifrados
+
+                # ESTEGANOGRAFÍA: Inyectamos el payload en la imagen
+                if portador:
+                    with open(portador, "rb") as img:
+                        bytes_imagen = img.read()
+                    
+                    nuevo_nombre = ruta + "_secure.png"
+                    with open(nuevo_nombre, "wb") as stego_file:
+                        stego_file.write(bytes_imagen + STEGO_SEPARATOR + payload_seguro)
+                else:
+                    nuevo_nombre = ruta + ".enc"
+                    with open(nuevo_nombre, "wb") as archivo_cifrado:
+                        archivo_cifrado.write(payload_seguro)
                 
                 borrado_seguro(ruta)
             
             self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
         except Exception as e:
-            self.after(500, self.finalizar_operacion, "ERROR BATCH ENCRIPTACION", False, str(e))
+            self.after(500, self.finalizar_operacion, "ERROR ENCRIPTACION", False, str(e))
 
-    # --- LÓGICA BATCH PARA DESCIFRADO ---
+    # --- LÓGICA BATCH PARA DESCIFRADO (AUTO-DETECT) ---
     def iniciar_descifrado(self):
         if not self.validar_entradas(es_descifrado=True): return
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: VALIDANDO CREDENCIALES MULTI-FACTOR...", text_color="#00E5FF")
+        self.lbl_estado.configure(text="SYS_STATUS: VALIDANDO CREDENCIALES...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_descifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile), daemon=True).start()
 
     def tarea_descifrar_batch(self, password, keyfile):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=True)
             if not archivos:
-                raise Exception("No se encontraron archivos .enc en el target.")
+                raise Exception("No se encontraron archivos válidos para descifrar.")
 
             errores = 0
+            procesados = 0
             for ruta in archivos:
                 try:
-                    with open(ruta, "rb") as archivo_cifrado:
-                        contenido = archivo_cifrado.read()
+                    with open(ruta, "rb") as target_file:
+                        contenido = target_file.read()
 
-                    salt = contenido[:16]
-                    datos_cifrados = contenido[16:]
+                    # DETECCIÓN DE ESTEGANOGRAFÍA
+                    if STEGO_SEPARATOR in contenido:
+                        _, payload = contenido.split(STEGO_SEPARATOR, 1)
+                    else:
+                        payload = contenido
 
-                    # Requerimos el mismo keyfile para regenerar la llave correcta
+                    salt = payload[:16]
+                    datos_cifrados = payload[16:]
+
                     llave = generar_llave_desde_password(password, salt, keyfile)
                     f = Fernet(llave)
 
                     datos_descifrados = f.decrypt(datos_cifrados)
 
-                    nombre_original = ruta.replace(".enc", "")
+                    nombre_original = ruta.replace("_secure.png", "").replace(".enc", "")
                     with open(nombre_original, "wb") as archivo_descifrado:
                         archivo_descifrado.write(datos_descifrados)
 
                     borrado_seguro(ruta)
+                    procesados += 1
                 except Exception:
                     errores += 1
             
-            if errores > 0:
-                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso terminado. {errores} archivos fallaron (Contraseña o Keyfile incorrectos).")
+            if errores > 0 and procesados == 0:
+                 self.after(500, self.finalizar_operacion, "ERROR CRÍTICO", False, f"Las credenciales fallaron o los archivos están corruptos.")
+            elif errores > 0:
+                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} archivos fallaron.")
             else:
-                self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
+                self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {procesados} ARCHIVOS", True, "")
         except Exception as e:
-            self.after(500, self.finalizar_operacion, "ERROR BATCH DESENCRIPTACION", False, str(e))
+            self.after(500, self.finalizar_operacion, "ERROR DESENCRIPTACION", False, str(e))
 
     def finalizar_operacion(self, operacion, exito, error_msg):
         self.progressbar.stop()
@@ -313,23 +351,21 @@ class CryptoVaultApp(ctk.CTk):
         
         target_registrado = self.ruta_target
         usando_2fa = "SI" if self.ruta_keyfile else "NO"
+        usando_stego = "SI" if self.ruta_portador else "NO"
 
         if exito:
-            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | Estado: EXITO")
+            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Estado: EXITO")
             self.limpiar_ui()
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
-            messagebox.showinfo("SYS_MSG", f"Operación Batch completada: {operacion}.")
+            messagebox.showinfo("SYS_MSG", f"Operación completada: {operacion}.")
         else:
-            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | Estado: FALLIDO | Causa: {error_msg}")
-            self.lbl_estado.configure(text="SYS_STATUS: ADVERTENCIA / ERROR BATCH", text_color="#DC2626")
+            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Causa: {error_msg}")
+            self.lbl_estado.configure(text="SYS_STATUS: ADVERTENCIA / ERROR", text_color="#DC2626")
             messagebox.showerror("SYS_ERR", error_msg)
 
     def validar_entradas(self, es_descifrado=False):
         if not self.ruta_target:
             messagebox.showwarning("SYS_WARN", "Target no seleccionado.")
-            return False
-        if not self.es_carpeta and es_descifrado and not self.ruta_target.endswith(".enc"):
-            messagebox.showerror("SYS_ERR", "Formato inválido. Selecciona una carpeta o un archivo .enc")
             return False
         if not self.entrada_password.get():
             messagebox.showwarning("SYS_WARN", "Se requiere master_key.")
@@ -340,8 +376,9 @@ class CryptoVaultApp(ctk.CTk):
         self.ruta_target = None
         self.es_carpeta = False
         self.ruta_keyfile = None
+        self.ruta_portador = None
         self.lbl_archivo.configure(text=">_ Esperando target...", text_color="#4B5563")
-        self.lbl_keyfile.configure(text="[ 2FA: INACTIVO ]", text_color="#4B5563")
+        self.actualizar_status_avanzado()
         self.entrada_password.delete(0, 'end')
         self.chk_mostrar_pass.deselect()
         self.entrada_password.configure(show="*")
