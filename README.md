@@ -1,54 +1,26 @@
-# 🛡️ CRYPTO-VAULT
+# [ 🛡️ CRYPTO-VAULT V7.0 ]
 
-**Motor de encriptación local con interfaz gráfica (GUI) de grado militar.**
-
-Crypto-Vault es una herramienta diseñada para asegurar archivos confidenciales y **directorios completos (Batch Processing)** mediante cifrado simétrico avanzado, protegiendo la información en entornos locales.
-
----
-
-## ⚙️ ESPECIFICACIONES TÉCNICAS
-
-- **Algoritmo Core:** `AES-256` (Advanced Encryption Standard), operando a través de la librería criptográfica nativa de Python.
-- **Derivación de Claves (KDF):** Implementa `PBKDF2HMAC` utilizando `SHA-256` con 480,000 iteraciones automáticas y *salt* aleatorio.
-- **Procesamiento Masivo (V4.0):** Integración de `os.walk` para el escaneo y encriptación recursiva de directorios completos de forma simultánea.
-- **Arquitectura GUI:** Construida sobre `CustomTkinter` utilizando manejo de hilos (*threading*) asíncronos para aislar el motor matemático de la interfaz visual.
-- **Borrado Forense (Shredding): Antes de eliminar los archivos originales o descifrados, el sistema sobrescribe el espacio en disco con ruido estático (bytes aleatorios), haciendo imposible su recuperación mediante software forense
+**Bóveda criptográfica local con arquitectura Zero-Trust y contramedidas forenses.**
+Herramienta de encriptación diseñada para proteger archivos y directorios mediante cifrado simétrico AES-256, esteganografía y protocolos de autodestrucción.
 
 ---
 
-## 📦 DESPLIEGUE E INSTALACIÓN
+### ⚙️ ESPECIFICACIONES TÉCNICAS (V7.0)
 
-Requiere **Python 3.8** o superior.
+* **Motor Core:** Cifrado `AES-256` con derivación de claves `PBKDF2HMAC` (480k iteraciones + Salt dinámico).
+* **2FA Físico (Keyfile):** Soporte para autenticación de dos factores utilizando bytes arbitrarios de cualquier archivo local (MP3, JPG, PDF) fusionados con la `master_key`.
+* **Esteganografía (Stego-Payload):** Capacidad de ofuscar datos cifrados inyectándolos en la capa final del código binario de imágenes portadoras (`.png`, `.jpg`).
+* **Borrado Forense (Shredding):** Sobrescritura en disco con ruido estático previo a la eliminación mediante `os.remove` para mitigar recuperación de datos.
+* **Protocolo Anti-Fuerza Bruta (Modo Pánico):** Auto-destrucción irreversible de payloads tras 3 intentos de descifrado fallidos.
+
+---
+
+### 📦 COMPILACIÓN Y DESPLIEGUE
+
+El proyecto ha sido empaquetado en un binario independiente (`.exe`) sin dependencias externas usando PyInstaller. 
+*(Nota: Los binarios no se alojan en este repositorio por políticas de seguridad).*
 
 ```bash
-pip install cryptography customtkinter
-
-git clone https://github.com/tu-usuario/crypto-vault.git
-cd crypto-vault
-```
-
----
-
-## 🚀 MANUAL DE OPERACIÓN
-
-```bash
-python vault.py
-```
-
-### Flujo de Trabajo
-
-#### 1. Target
-Selecciona si deseas procesar un solo **Archivo** o una **Carpeta** completa.
-
-#### 2. Master Key
-Ingresa tu credencial o utiliza el generador interno (**⚡ Generar**) para crear un token seguro.
-
-#### 3. Ejecución
-El sistema procesará el objetivo seleccionado, destruyendo los originales (`os.remove`) y dejando únicamente los artefactos `.enc`.
-
----
-
-> [!WARNING]
-> **CRITICAL DATA LOSS**
->
-> La arquitectura opera bajo políticas **Zero-Knowledge**. La pérdida de la `master_key` resulta en la pérdida irreversible de todos los archivos y carpetas procesados.
+# Compilación manual desde código fuente
+pip install requirements.txt
+pyinstaller --noconsole --onefile --clean vault.py
