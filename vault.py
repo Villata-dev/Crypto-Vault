@@ -52,14 +52,14 @@ def borrado_seguro(ruta_archivo, pases=3):
         if os.path.exists(ruta_archivo):
             os.remove(ruta_archivo)
 
-# --- INTERFAZ GRÁFICA V7.0 (CYBER-TERMINAL + PANIC MODE) ---
+# --- INTERFAZ GRÁFICA V8.0 (CYBER-TERMINAL + AUDIT CONSOLE) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Grado Militar")
-        self.geometry("500x820")
+        self.geometry("500x850")  # Ajuste de tamaño para la consola integrada
         self.resizable(False, False)
         
         self.configure(fg_color="#0B0E14")
@@ -70,7 +70,6 @@ class CryptoVaultApp(ctk.CTk):
         self.ruta_portador = None
         self.es_carpeta = False
         
-        # SISTEMA ANTI-FUERZA BRUTA
         self.intentos_fallidos = 0
         self.max_intentos = 3
 
@@ -80,11 +79,11 @@ class CryptoVaultApp(ctk.CTk):
 
         # --- CONTENEDOR PRINCIPAL ---
         self.main_frame = ctk.CTkFrame(self, fg_color="#151A22", corner_radius=4, border_width=1, border_color="#2A3241")
-        self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
+        self.main_frame.pack(pady=15, padx=20, fill="both", expand=True)
 
-        # 1. CABECERA
+        # CABECERA
         self.title_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.title_frame.pack(pady=(20, 5))
+        self.title_frame.pack(pady=(15, 5))
 
         self.lbl_corchete_izq = ctk.CTkLabel(self.title_frame, text="[ ", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_izq.pack(side="left")
@@ -98,10 +97,10 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // ZERO-TRUST ARCHITECTURE", text_color="#5C6B89", font=self.font_mono)
-        self.lbl_subtitulo.pack(pady=(0, 15))
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // CONSOLE AUDIT", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo.pack(pady=(0, 10))
 
-        # --- SECCIÓN DE ARCHIVO / CARPETA (TARGET) ---
+        # --- SECCIÓN DE TARGET ---
         self.file_frame = ctk.CTkFrame(self.main_frame, fg_color="#1E2430", corner_radius=2)
         self.file_frame.pack(pady=5, padx=20, fill="x")
 
@@ -120,7 +119,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_archivo = ctk.CTkLabel(self.file_frame, text=">_ Esperando target...", text_color="#4B5563", font=self.font_mono, wraplength=400)
         self.lbl_archivo.pack(pady=(0, 10))
 
-        # --- SECCIÓN DE SEGURIDAD Y CAMUFLAJE ---
+        # --- SECCIÓN DE CREDENCIALES ---
         self.security_frame = ctk.CTkFrame(self.main_frame, fg_color="#1E2430", corner_radius=2)
         self.security_frame.pack(pady=5, padx=20, fill="x")
 
@@ -148,22 +147,27 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_portador = ctk.CTkButton(self.tools_frame, text="🖼️ Portador", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#EC4899", text_color="#EC4899", hover_color="#BE185D", corner_radius=2, width=120, command=self.seleccionar_portador)
         self.btn_portador.grid(row=0, column=1, padx=5)
         
-        # NUEVO: Switch del Modo Pánico
         self.switch_autodestruccion = ctk.CTkSwitch(self.security_frame, text="💣 Protocolo Auto-Destrucción", font=self.font_bold, text_color="#EF4444", progress_color="#EF4444", button_color="#7F1D1D", button_hover_color="#991B1B")
-        self.switch_autodestruccion.pack(pady=(10, 5))
+        self.switch_autodestruccion.pack(pady=(5, 5))
 
-        self.lbl_status_avanzado = ctk.CTkLabel(self.security_frame, text="[ 2FA: OFF ] | [ STEGO: OFF ]", text_color="#4B5563", font=self.font_mono, wraplength=400)
-        self.lbl_status_avanzado.pack(pady=(0, 10))
+        self.lbl_status_avanzado = ctk.CTkLabel(self.security_frame, text="[ 2FA: OFF ] | [ STEGO: OFF ]", text_color="#4B5563", font=self.font_mono)
+        self.lbl_status_avanzado.pack(pady=(0, 5))
 
-        # --- SECCIÓN DE ACCIÓN ---
+        # --- SECCIÓN DE ACCIÓN Y CONSOLA ---
         self.action_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.action_frame.pack(pady=10)
 
-        self.btn_cifrar = ctk.CTkButton(self.action_frame, text="[ 🔒 ENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#EF4444", text_color="#EF4444", hover_color="#7F1D1D", font=self.font_bold, width=150, height=42, corner_radius=2, command=self.iniciar_cifrado)
-        self.btn_cifrar.grid(row=0, column=0, padx=10)
+        self.btn_cifrar = ctk.CTkButton(self.action_frame, text="[ 🔒 ENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#EF4444", text_color="#EF4444", hover_color="#7F1D1D", font=self.font_bold, width=140, height=42, corner_radius=2, command=self.iniciar_cifrado)
+        self.btn_cifrar.grid(row=0, column=0, padx=5)
 
-        self.btn_descifrar = ctk.CTkButton(self.action_frame, text="[ 🔓 DESENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", font=self.font_bold, width=150, height=42, corner_radius=2, command=self.iniciar_descifrado)
-        self.btn_descifrar.grid(row=0, column=1, padx=10)
+        self.btn_descifrar = ctk.CTkButton(self.action_frame, text="[ 🔓 DESENCRIPTAR ]", fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", font=self.font_bold, width=140, height=42, corner_radius=2, command=self.iniciar_descifrado)
+        self.btn_descifrar.grid(row=0, column=1, padx=5)
+
+        self.btn_logs = ctk.CTkButton(self.action_frame, text="[ 📑 AUDIT ]", fg_color="transparent", border_width=1, border_color="#00E5FF", text_color="#00E5FF", hover_color="#0F3846", font=self.font_bold, width=100, height=42, corner_radius=2, command=self.toggle_consola_logs)
+        self.btn_logs.grid(row=0, column=2, padx=5)
+
+        # CONSOLA DE TEXTO (Desplegable internamente)
+        self.txt_consola = ctk.CTkTextbox(self.main_frame, height=140, font=self.font_mono, fg_color="#090B10", text_color="#10B981", border_width=1, border_color="#2A3241", corner_radius=2, state="disabled")
 
         # --- BARRA DE PROGRESO ---
         self.progressbar = ctk.CTkProgressBar(self.main_frame, mode="indeterminate", width=350, progress_color="#00E5FF", fg_color="#1E2430")
@@ -172,8 +176,35 @@ class CryptoVaultApp(ctk.CTk):
         # --- BARRA DE ESTADO ---
         self.lbl_estado = ctk.CTkLabel(self, text="SYS_STATUS: INACTIVO", text_color="#4B5563", font=self.font_mono)
         self.lbl_estado.pack(side="bottom", pady=5)
+        
+        # Cargar los registros existentes al iniciar
+        self.actualizar_consola_logs()
 
     # --- FUNCIONES DE LA INTERFAZ ---
+
+    def toggle_consola_logs(self):
+        """Muestra u oculta la terminal de logs en la UI"""
+        if self.txt_consola.winfo_manager():
+            self.txt_consola.pack_forget()
+            self.lbl_estado.configure(text="SYS_STATUS: CONSOLA OCULTA.")
+        else:
+            self.actualizar_consola_logs()
+            self.txt_consola.pack(pady=10, padx=20, fill="x", before=self.progressbar)
+            self.txt_consola.see("end")
+            self.lbl_estado.configure(text="SYS_STATUS: MONITOR DE AUDITORÍA ACTIVO.")
+
+    def actualizar_consola_logs(self):
+        """Lee el archivo log e inyecta las líneas en el textbox estilo hacker"""
+        if os.path.exists("vault_history.log"):
+            with open("vault_history.log", "r", encoding="utf-8") as f:
+                lineas = f.readlines()
+            
+            self.txt_consola.configure(state="normal")
+            self.txt_consola.delete("1.0", "end")
+            # Mostramos las últimas 30 líneas para no sobrecargar el buffer
+            self.txt_consola.insert("1.0", "".join(lineas[-30:]))
+            self.txt_consola.configure(state="disabled")
+            self.txt_consola.see("end")
 
     def actualizar_status_avanzado(self):
         kf_status = "ON" if self.ruta_keyfile else "OFF"
@@ -231,6 +262,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_keyfile.configure(state=estado)
         self.btn_portador.configure(state=estado)
         self.switch_autodestruccion.configure(state=estado)
+        self.btn_logs.configure(state=estado)
 
     def obtener_lista_archivos(self, es_descifrado=False):
         archivos_a_procesar = []
@@ -248,7 +280,6 @@ class CryptoVaultApp(ctk.CTk):
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
 
-    # --- LÓGICA BATCH PARA CIFRADO ---
     def iniciar_cifrado(self):
         if not self.validar_entradas(): return
         self.bloquear_ui(True)
@@ -283,7 +314,6 @@ class CryptoVaultApp(ctk.CTk):
         except Exception as e:
             self.after(500, self.finalizar_operacion, "ERROR ENCRIPTACION", False, str(e))
 
-    # --- LÓGICA BATCH PARA DESCIFRADO (PANIC MODE ENABLED) ---
     def iniciar_descifrado(self):
         if not self.validar_entradas(es_descifrado=True): return
         self.bloquear_ui(True)
@@ -325,13 +355,11 @@ class CryptoVaultApp(ctk.CTk):
             
             if errores > 0 and procesados == 0:
                 self.intentos_fallidos += 1
-                
-                # PROTOCOLO DE AUTO-DESTRUCCIÓN
                 if autodestruccion_activa == 1 and self.intentos_fallidos >= self.max_intentos:
                     for ruta in archivos:
-                        borrado_seguro(ruta) # Aniquila los archivos encriptados
+                        borrado_seguro(ruta)
                     logging.critical("PANIC MODE TRIGGERED: ARCHIVOS ANIQUILADOS POR FUERZA BRUTA.")
-                    self.intentos_fallidos = 0 # Reiniciamos el contador post-destrucción
+                    self.intentos_fallidos = 0
                     self.after(500, self.finalizar_operacion, "PROTOCOLO DE AUTO-DESTRUCCIÓN", False, "ATENCIÓN: Múltiples fallos detectados. Los archivos encriptados han sido destruidos irreversiblemente.")
                     return
 
@@ -340,7 +368,7 @@ class CryptoVaultApp(ctk.CTk):
             elif errores > 0:
                 self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} archivos fallaron.")
             else:
-                self.intentos_fallidos = 0 # Si hay éxito, el contador vuelve a cero
+                self.intentos_fallidos = 0
                 self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {procesados} ARCHIVOS", True, "")
         except Exception as e:
             self.after(500, self.finalizar_operacion, "ERROR DESENCRIPTACION", False, str(e))
@@ -349,17 +377,26 @@ class CryptoVaultApp(ctk.CTk):
         self.progressbar.stop()
         self.progressbar.pack_forget()
         self.bloquear_ui(False)
+        
+        target_registrado = self.ruta_target
+        usando_2fa = "SI" if self.ruta_keyfile else "NO"
+        usando_stego = "SI" if self.ruta_portador else "NO"
 
         if exito:
+            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Estado: EXITO")
             self.limpiar_ui()
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
             messagebox.showinfo("SYS_MSG", f"Operación completada: {operacion}.")
         else:
+            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Causa: {error_msg}")
             color_alerta = "#DC2626"
             if "AUTO-DESTRUCCIÓN" in operacion:
                 color_alerta = "#991B1B"
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color_alerta)
             messagebox.showerror("SYS_ERR", error_msg)
+        
+        # Sincronizar inmediatamente la consola visual con el nuevo log generado
+        self.actualizar_consola_logs()
 
     def validar_entradas(self, es_descifrado=False):
         if not self.ruta_target:
@@ -373,7 +410,10 @@ class CryptoVaultApp(ctk.CTk):
     def limpiar_ui(self):
         self.ruta_target = None
         self.es_carpeta = False
+        self.ruta_keyfile = None
+        self.ruta_portador = None
         self.lbl_archivo.configure(text=">_ Esperando target...", text_color="#4B5563")
+        self.actualizar_status_avanzado()
         self.entrada_password.delete(0, 'end')
         self.chk_mostrar_pass.deselect()
         self.entrada_password.configure(show="*")
