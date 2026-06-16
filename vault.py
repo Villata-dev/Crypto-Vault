@@ -5,6 +5,7 @@ import string
 import secrets
 import logging
 import hashlib
+import qrcode
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -20,8 +21,6 @@ logging.basicConfig(
 )
 
 STEGO_SEPARATOR = b"||CV_STEGO_PAYLOAD||"
-
-# Extensiones críticas del sistema inmunes al cifrado masivo para evitar brickeo del OS
 EXTENSIONS_BLACKLIST = ['.exe', '.dll', '.sys', '.ini', '.lnk', '.bat', '.msi', '.reg']
 
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
@@ -57,7 +56,6 @@ def borrado_seguro(ruta_archivo, pases=3):
             os.remove(ruta_archivo)
 
 def calcular_hash_sha256(ruta_archivo):
-    """Calcula la firma digital SHA-256 por bloques para no saturar la memoria"""
     sha256 = hashlib.sha256()
     try:
         with open(ruta_archivo, "rb") as f:
@@ -67,7 +65,7 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V9.0 (CYBER-TERMINAL + PROTECTION FILTERS) ---
+# --- INTERFAZ GRÁFICA V10.0 (CYBER-TERMINAL + COLD STORAGE) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -112,7 +110,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // INTEGRITY FILTERS", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // COLD STORAGE ENABLED", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -147,11 +145,14 @@ class CryptoVaultApp(ctk.CTk):
         self.pass_frame = ctk.CTkFrame(self.security_frame, fg_color="transparent")
         self.pass_frame.pack(pady=5)
 
-        self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="Ingresa master_key", show="*", width=200, height=35, font=self.font_mono, fg_color="#0F1219", border_color="#374151", corner_radius=2)
-        self.entrada_password.grid(row=0, column=0, padx=(0, 10))
+        self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="master_key", show="*", width=150, height=35, font=self.font_mono, fg_color="#0F1219", border_color="#374151", corner_radius=2)
+        self.entrada_password.grid(row=0, column=0, padx=(0, 5))
 
-        self.btn_generar = ctk.CTkButton(self.pass_frame, text="⚡ Generar", width=90, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, command=self.generar_password)
-        self.btn_generar.grid(row=0, column=1)
+        self.btn_generar = ctk.CTkButton(self.pass_frame, text="⚡ Gen", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, command=self.generar_password)
+        self.btn_generar.grid(row=0, column=1, padx=(0, 5))
+
+        self.btn_qr = ctk.CTkButton(self.pass_frame, text="🖨️ QR", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#F59E0B", text_color="#F59E0B", hover_color="#B45309", corner_radius=2, command=self.exportar_qr)
+        self.btn_qr.grid(row=0, column=2)
 
         self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Visibilidad", font=self.font_mono, text_color="#9CA3AF", fg_color="#00E5FF", hover_color="#00B3CC", corner_radius=2, checkbox_width=16, checkbox_height=16, border_width=1, command=self.toggle_password)
         self.chk_mostrar_pass.pack(pady=(5, 5))
@@ -196,8 +197,36 @@ class CryptoVaultApp(ctk.CTk):
 
     # --- FUNCIONES DE LA INTERFAZ ---
 
+    def exportar_qr(self):
+        """Genera un código QR de la Master Key para respaldo físico"""
+        clave = self.entrada_password.get()
+        if not clave:
+            messagebox.showwarning("SYS_WARN", "Genera o ingresa una master_key primero.")
+            return
+
+        ruta_guardado = filedialog.asksaveasfilename(
+            defaultextension=".png", 
+            initialfile="vault_recovery_key.png",
+            title="Exportar QR Code (Paper Wallet)",
+            filetypes=[("Imágenes PNG", "*.png")]
+        )
+        
+        if ruta_guardado:
+            try:
+                qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                qr.add_data(clave)
+                qr.make(fit=True)
+                img = qr.make_image(fill_color="black", back_color="white")
+                img.save(ruta_guardado)
+                
+                logging.info(f"QR CODE | Respaldo fisico exportado a: {ruta_guardado}")
+                self.actualizar_consola_logs()
+                self.lbl_estado.configure(text="SYS_STATUS: PAPER WALLET EXPORTADA.", text_color="#F59E0B")
+                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.\n\nGuarda este archivo en un lugar seguro o imprímelo. Cualquiera con acceso a este QR tendrá tu master_key.")
+            except Exception as e:
+                messagebox.showerror("SYS_ERR", f"Error al generar QR: {e}")
+
     def ejecutar_checksum(self):
-        """Calcula de forma asíncrona la firma SHA-256 del target"""
         if not self.ruta_target or self.es_carpeta:
             messagebox.showwarning("SYS_WARN", "Selecciona un archivo individual para calcular su firma hash.")
             return
@@ -280,7 +309,6 @@ class CryptoVaultApp(ctk.CTk):
             self.lbl_archivo.configure(text=f">_ {prefijo} {nombre_corto}", text_color="#00E5FF")
 
     def prevenir_brickeo_sistema(self, ruta_archivo):
-        """Retorna True si el archivo está protegido por la blacklist del OS"""
         _, ext = os.path.splitext(ruta_archivo.lower())
         return ext in EXTENSIONS_BLACKLIST
 
@@ -296,6 +324,7 @@ class CryptoVaultApp(ctk.CTk):
         self.switch_autodestruccion.configure(state=estado)
         self.btn_logs.configure(state=estado)
         self.btn_checksum.configure(state=estado)
+        self.btn_qr.configure(state=estado)
 
     def obtener_lista_archivos(self, es_descifrado=False):
         archivos_a_procesar = []
@@ -309,7 +338,6 @@ class CryptoVaultApp(ctk.CTk):
                         if ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
                     else:
-                        # Si es cifrado masivo, aplicamos el OS Safety Filter
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             if self.prevenir_brickeo_sistema(ruta_completa):
                                 logging.warning(f"OS PROTECTION: Archivo omitido para prevenir corrupcion -> {ruta_completa}")
