@@ -4,6 +4,7 @@ import threading
 import string
 import secrets
 import logging
+import hashlib
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -19,6 +20,9 @@ logging.basicConfig(
 )
 
 STEGO_SEPARATOR = b"||CV_STEGO_PAYLOAD||"
+
+# Extensiones críticas del sistema inmunes al cifrado masivo para evitar brickeo del OS
+EXTENSIONS_BLACKLIST = ['.exe', '.dll', '.sys', '.ini', '.lnk', '.bat', '.msi', '.reg']
 
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
 
@@ -52,14 +56,25 @@ def borrado_seguro(ruta_archivo, pases=3):
         if os.path.exists(ruta_archivo):
             os.remove(ruta_archivo)
 
-# --- INTERFAZ GRÁFICA V8.0 (CYBER-TERMINAL + AUDIT CONSOLE) ---
+def calcular_hash_sha256(ruta_archivo):
+    """Calcula la firma digital SHA-256 por bloques para no saturar la memoria"""
+    sha256 = hashlib.sha256()
+    try:
+        with open(ruta_archivo, "rb") as f:
+            while chunk := f.read(8192):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+    except Exception:
+        return None
+
+# --- INTERFAZ GRÁFICA V9.0 (CYBER-TERMINAL + PROTECTION FILTERS) ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Grado Militar")
-        self.geometry("500x850")  # Ajuste de tamaño para la consola integrada
+        self.geometry("500x860")
         self.resizable(False, False)
         
         self.configure(fg_color="#0B0E14")
@@ -97,7 +112,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // CONSOLE AUDIT", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // INTEGRITY FILTERS", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -110,11 +125,14 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_select_frame = ctk.CTkFrame(self.file_frame, fg_color="transparent")
         self.btn_select_frame.pack(pady=5)
 
-        self.btn_sel_archivo = ctk.CTkButton(self.btn_select_frame, text="Archivo", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#3B82F6", text_color="#3B82F6", hover_color="#1E3A8A", corner_radius=2, width=100, command=lambda: self.seleccionar_target(tipo="archivo"))
-        self.btn_sel_archivo.grid(row=0, column=0, padx=5)
+        self.btn_sel_archivo = ctk.CTkButton(self.btn_select_frame, text="Archivo", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#3B82F6", text_color="#3B82F6", hover_color="#1E3A8A", corner_radius=2, width=90, command=lambda: self.seleccionar_target(tipo="archivo"))
+        self.btn_sel_archivo.grid(row=0, column=0, padx=3)
 
-        self.btn_sel_carpeta = ctk.CTkButton(self.btn_select_frame, text="Carpeta", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, width=100, command=lambda: self.seleccionar_target(tipo="carpeta"))
-        self.btn_sel_carpeta.grid(row=0, column=1, padx=5)
+        self.btn_sel_carpeta = ctk.CTkButton(self.btn_select_frame, text="Carpeta", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, width=90, command=lambda: self.seleccionar_target(tipo="carpeta"))
+        self.btn_sel_carpeta.grid(row=0, column=1, padx=3)
+
+        self.btn_checksum = ctk.CTkButton(self.btn_select_frame, text="SHA-256", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", corner_radius=2, width=90, command=self.ejecutar_checksum)
+        self.btn_checksum.grid(row=0, column=2, padx=3)
 
         self.lbl_archivo = ctk.CTkLabel(self.file_frame, text=">_ Esperando target...", text_color="#4B5563", font=self.font_mono, wraplength=400)
         self.lbl_archivo.pack(pady=(0, 10))
@@ -166,43 +184,52 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_logs = ctk.CTkButton(self.action_frame, text="[ 📑 AUDIT ]", fg_color="transparent", border_width=1, border_color="#00E5FF", text_color="#00E5FF", hover_color="#0F3846", font=self.font_bold, width=100, height=42, corner_radius=2, command=self.toggle_consola_logs)
         self.btn_logs.grid(row=0, column=2, padx=5)
 
-        # CONSOLA DE TEXTO (Desplegable internamente)
         self.txt_consola = ctk.CTkTextbox(self.main_frame, height=140, font=self.font_mono, fg_color="#090B10", text_color="#10B981", border_width=1, border_color="#2A3241", corner_radius=2, state="disabled")
 
-        # --- BARRA DE PROGRESO ---
         self.progressbar = ctk.CTkProgressBar(self.main_frame, mode="indeterminate", width=350, progress_color="#00E5FF", fg_color="#1E2430")
         self.progressbar.set(0)
 
-        # --- BARRA DE ESTADO ---
         self.lbl_estado = ctk.CTkLabel(self, text="SYS_STATUS: INACTIVO", text_color="#4B5563", font=self.font_mono)
         self.lbl_estado.pack(side="bottom", pady=5)
         
-        # Cargar los registros existentes al iniciar
         self.actualizar_consola_logs()
 
     # --- FUNCIONES DE LA INTERFAZ ---
 
+    def ejecutar_checksum(self):
+        """Calcula de forma asíncrona la firma SHA-256 del target"""
+        if not self.ruta_target or self.es_carpeta:
+            messagebox.showwarning("SYS_WARN", "Selecciona un archivo individual para calcular su firma hash.")
+            return
+        
+        def tarea_hash():
+            self.lbl_estado.configure(text="SYS_STATUS: CALCULANDO VALOR HASH...", text_color="#10B981")
+            firma = calcular_hash_sha256(self.ruta_target)
+            if firma:
+                logging.info(f"INTEGRITY CHECK | Archivo: {os.path.basename(self.ruta_target)} | SHA-256: {firma}")
+                self.actualizar_consola_logs()
+                self.lbl_estado.configure(text=f"SHA-256: {firma[:16]}...", text_color="#00E5FF")
+                messagebox.showinfo("INTEGRITY CHECK", f"Firma SHA-256 calculada exitosamente:\n\n{firma}\n\nEl resultado ha sido exportado al log.")
+            else:
+                self.lbl_estado.configure(text="SYS_STATUS: ERROR AL CALCULAR HASH", text_color="#DC2626")
+
+        threading.Thread(target=tarea_hash, daemon=True).start()
+
     def toggle_consola_logs(self):
-        """Muestra u oculta la terminal de logs en la UI"""
         if self.txt_consola.winfo_manager():
             self.txt_consola.pack_forget()
-            self.lbl_estado.configure(text="SYS_STATUS: CONSOLA OCULTA.")
         else:
             self.actualizar_consola_logs()
             self.txt_consola.pack(pady=10, padx=20, fill="x", before=self.progressbar)
             self.txt_consola.see("end")
-            self.lbl_estado.configure(text="SYS_STATUS: MONITOR DE AUDITORÍA ACTIVO.")
 
     def actualizar_consola_logs(self):
-        """Lee el archivo log e inyecta las líneas en el textbox estilo hacker"""
         if os.path.exists("vault_history.log"):
             with open("vault_history.log", "r", encoding="utf-8") as f:
                 lineas = f.readlines()
-            
             self.txt_consola.configure(state="normal")
             self.txt_consola.delete("1.0", "end")
-            # Mostramos las últimas 30 líneas para no sobrecargar el buffer
-            self.txt_consola.insert("1.0", "".join(lineas[-30:]))
+            self.txt_consola.insert("1.0", "".join(lineas[-25:]))
             self.txt_consola.configure(state="disabled")
             self.txt_consola.see("end")
 
@@ -252,6 +279,11 @@ class CryptoVaultApp(ctk.CTk):
             prefijo = "[DIR]" if self.es_carpeta else "[FILE]"
             self.lbl_archivo.configure(text=f">_ {prefijo} {nombre_corto}", text_color="#00E5FF")
 
+    def prevenir_brickeo_sistema(self, ruta_archivo):
+        """Retorna True si el archivo está protegido por la blacklist del OS"""
+        _, ext = os.path.splitext(ruta_archivo.lower())
+        return ext in EXTENSIONS_BLACKLIST
+
     def bloquear_ui(self, bloqueado: bool):
         estado = "disabled" if bloqueado else "normal"
         self.btn_cifrar.configure(state=estado)
@@ -263,6 +295,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_portador.configure(state=estado)
         self.switch_autodestruccion.configure(state=estado)
         self.btn_logs.configure(state=estado)
+        self.btn_checksum.configure(state=estado)
 
     def obtener_lista_archivos(self, es_descifrado=False):
         archivos_a_procesar = []
@@ -276,7 +309,11 @@ class CryptoVaultApp(ctk.CTk):
                         if ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
                     else:
+                        # Si es cifrado masivo, aplicamos el OS Safety Filter
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
+                            if self.prevenir_brickeo_sistema(ruta_completa):
+                                logging.warning(f"OS PROTECTION: Archivo omitido para prevenir corrupcion -> {ruta_completa}")
+                                continue
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
 
@@ -291,6 +328,9 @@ class CryptoVaultApp(ctk.CTk):
     def tarea_cifrar_batch(self, password, keyfile, portador):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=False)
+            if not archivos:
+                raise Exception("Proceso abortado. No se encontraron archivos legibles o seguros para encriptar.")
+                
             for ruta in archivos:
                 salt = os.urandom(16)
                 llave = generar_llave_desde_password(password, salt, keyfile)
@@ -395,7 +435,6 @@ class CryptoVaultApp(ctk.CTk):
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color_alerta)
             messagebox.showerror("SYS_ERR", error_msg)
         
-        # Sincronizar inmediatamente la consola visual con el nuevo log generado
         self.actualizar_consola_logs()
 
     def validar_entradas(self, es_descifrado=False):
