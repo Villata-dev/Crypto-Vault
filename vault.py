@@ -9,6 +9,7 @@ import qrcode
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
+from cryptography.exceptions import InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -65,7 +66,7 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V10.0 (CYBER-TERMINAL + COLD STORAGE) ---
+# --- INTERFAZ GRÁFICA V11.0 ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -85,6 +86,7 @@ class CryptoVaultApp(ctk.CTk):
         
         self.intentos_fallidos = 0
         self.max_intentos = 3
+        self.timer_portapapeles = None
 
         self.font_title = ctk.CTkFont(family="Consolas", size=26, weight="bold")
         self.font_bold = ctk.CTkFont(family="Consolas", size=13, weight="bold")
@@ -110,7 +112,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // COLD STORAGE ENABLED", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // CLIPBOARD PURGE", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -197,8 +199,40 @@ class CryptoVaultApp(ctk.CTk):
 
     # --- FUNCIONES DE LA INTERFAZ ---
 
+    def generar_password(self):
+        caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
+        password_segura = ''.join(secrets.choice(caracteres) for _ in range(16))
+        self.entrada_password.delete(0, 'end')
+        self.entrada_password.insert(0, password_segura)
+        self.chk_mostrar_pass.select()
+        self.entrada_password.configure(show="")
+        
+        # Copiar de forma segura al portapapeles de Windows/Linux/Mac
+        self.clipboard_clear()
+        self.clipboard_append(password_segura)
+        
+        self.lbl_estado.configure(text="KEY EN PORTAPAPELES. DESTRUCCIÓN EN 20S.", text_color="#F59E0B")
+        logging.info("Master Key generada y volcada temporalmente al portapapeles del sistema.")
+        
+        # Si ya había un temporizador activo, cancelarlo antes de lanzar el nuevo
+        if self.timer_portapapeles and self.timer_portapapeles.is_alive():
+            self.timer_portapapeles.cancel()
+            
+        self.timer_portapapeles = threading.Timer(20.0, self.purgar_portapapeles)
+        self.timer_portapapeles.start()
+
+    def purgar_portapapeles(self):
+        """Borra el contenido de la memoria del portapapeles de forma segura"""
+        try:
+            self.clipboard_clear()
+            self.clipboard_append("")
+            self.lbl_estado.configure(text="SYS_STATUS: PORTAPAPELES PURGADO.", text_color="#5C6B89")
+            logging.info("Portapapeles del sistema limpiado automáticamente por la política de retención temporal.")
+            self.actualizar_consola_logs()
+        except Exception as e:
+            logging.error(f"Error al purgar portapapeles: {e}")
+
     def exportar_qr(self):
-        """Genera un código QR de la Master Key para respaldo físico"""
         clave = self.entrada_password.get()
         if not clave:
             messagebox.showwarning("SYS_WARN", "Genera o ingresa una master_key primero.")
@@ -222,7 +256,7 @@ class CryptoVaultApp(ctk.CTk):
                 logging.info(f"QR CODE | Respaldo fisico exportado a: {ruta_guardado}")
                 self.actualizar_consola_logs()
                 self.lbl_estado.configure(text="SYS_STATUS: PAPER WALLET EXPORTADA.", text_color="#F59E0B")
-                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.\n\nGuarda este archivo en un lugar seguro o imprímelo. Cualquiera con acceso a este QR tendrá tu master_key.")
+                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.\n\nGuarda este archivo en un lugar seguro.")
             except Exception as e:
                 messagebox.showerror("SYS_ERR", f"Error al generar QR: {e}")
 
@@ -238,7 +272,7 @@ class CryptoVaultApp(ctk.CTk):
                 logging.info(f"INTEGRITY CHECK | Archivo: {os.path.basename(self.ruta_target)} | SHA-256: {firma}")
                 self.actualizar_consola_logs()
                 self.lbl_estado.configure(text=f"SHA-256: {firma[:16]}...", text_color="#00E5FF")
-                messagebox.showinfo("INTEGRITY CHECK", f"Firma SHA-256 calculada exitosamente:\n\n{firma}\n\nEl resultado ha sido exportado al log.")
+                messagebox.showinfo("INTEGRITY CHECK", f"Firma SHA-256 calculada:\n\n{firma}")
             else:
                 self.lbl_estado.configure(text="SYS_STATUS: ERROR AL CALCULAR HASH", text_color="#DC2626")
 
@@ -279,14 +313,6 @@ class CryptoVaultApp(ctk.CTk):
         if ruta:
             self.ruta_portador = ruta
             self.actualizar_status_avanzado()
-
-    def generar_password(self):
-        caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
-        password_segura = ''.join(secrets.choice(caracteres) for _ in range(16))
-        self.entrada_password.delete(0, 'end')
-        self.entrada_password.insert(0, password_segura)
-        self.chk_mostrar_pass.select()
-        self.entrada_password.configure(show="")
 
     def toggle_password(self):
         if self.chk_mostrar_pass.get() == 1:
@@ -340,7 +366,7 @@ class CryptoVaultApp(ctk.CTk):
                     else:
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             if self.prevenir_brickeo_sistema(ruta_completa):
-                                logging.warning(f"OS PROTECTION: Archivo omitido para prevenir corrupcion -> {ruta_completa}")
+                                logging.warning(f"OS PROTECTION: Archivo omitido -> {ruta_completa}")
                                 continue
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
@@ -357,7 +383,7 @@ class CryptoVaultApp(ctk.CTk):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=False)
             if not archivos:
-                raise Exception("Proceso abortado. No se encontraron archivos legibles o seguros para encriptar.")
+                raise Exception("No se encontraron archivos seguros para encriptar.")
                 
             for ruta in archivos:
                 salt = os.urandom(16)
@@ -418,6 +444,9 @@ class CryptoVaultApp(ctk.CTk):
 
                     borrado_seguro(ruta)
                     procesados += 1
+                except InvalidToken:
+                    # Captura específica de error criptográfico (Firma o clave incorrecta)
+                    errores += 1
                 except Exception:
                     errores += 1
             
@@ -426,15 +455,15 @@ class CryptoVaultApp(ctk.CTk):
                 if autodestruccion_activa == 1 and self.intentos_fallidos >= self.max_intentos:
                     for ruta in archivos:
                         borrado_seguro(ruta)
-                    logging.critical("PANIC MODE TRIGGERED: ARCHIVOS ANIQUILADOS POR FUERZA BRUTA.")
+                    logging.critical("PANIC MODE TRIGGERED: DATA DESTRUIDA POR EXCESO DE INTENTOS.")
                     self.intentos_fallidos = 0
-                    self.after(500, self.finalizar_operacion, "PROTOCOLO DE AUTO-DESTRUCCIÓN", False, "ATENCIÓN: Múltiples fallos detectados. Los archivos encriptados han sido destruidos irreversiblemente.")
+                    self.after(500, self.finalizar_operacion, "AUTO-DESTRUCCIÓN", False, "Protocolo de panico ejecutado. Datos purgados.")
                     return
 
-                msg_error = f"Credenciales denegadas. Intento {self.intentos_fallidos}/{self.max_intentos} antes de Auto-Destrucción." if autodestruccion_activa == 1 else "Las credenciales fallaron."
-                self.after(500, self.finalizar_operacion, "ERROR CRÍTICO", False, msg_error)
+                msg_error = f"Credenciales invalidas. Intento {self.intentos_fallidos}/{self.max_intentos}."
+                self.after(500, self.finalizar_operacion, "ACCESO DENEGADO", False, msg_error)
             elif errores > 0:
-                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} archivos fallaron.")
+                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} fallas detectadas.")
             else:
                 self.intentos_fallidos = 0
                 self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {procesados} ARCHIVOS", True, "")
@@ -448,19 +477,16 @@ class CryptoVaultApp(ctk.CTk):
         
         target_registrado = self.ruta_target
         usando_2fa = "SI" if self.ruta_keyfile else "NO"
-        usando_stego = "SI" if self.ruta_portador else "NO"
 
         if exito:
-            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Estado: EXITO")
+            logging.info(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | Estado: EXITO")
             self.limpiar_ui()
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
             messagebox.showinfo("SYS_MSG", f"Operación completada: {operacion}.")
         else:
-            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | 2FA: {usando_2fa} | STEGO: {usando_stego} | Causa: {error_msg}")
-            color_alerta = "#DC2626"
-            if "AUTO-DESTRUCCIÓN" in operacion:
-                color_alerta = "#991B1B"
-            self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color_alerta)
+            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | Estado: FALLIDO | Causa: {error_msg}")
+            color = "#991B1B" if "DESTRUCCIÓN" in operacion else "#DC2626"
+            self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color)
             messagebox.showerror("SYS_ERR", error_msg)
         
         self.actualizar_consola_logs()
