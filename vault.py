@@ -66,14 +66,14 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V11.0 ---
+# --- INTERFAZ GRÁFICA V12.0 ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Grado Militar")
-        self.geometry("500x860")
+        self.geometry("500x880")
         self.resizable(False, False)
         
         self.configure(fg_color="#0B0E14")
@@ -112,7 +112,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // CLIPBOARD PURGE", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // ENTROPY ANALYZER", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -149,12 +149,18 @@ class CryptoVaultApp(ctk.CTk):
 
         self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="master_key", show="*", width=150, height=35, font=self.font_mono, fg_color="#0F1219", border_color="#374151", corner_radius=2)
         self.entrada_password.grid(row=0, column=0, padx=(0, 5))
+        # Vincular el evento de teclado para analizar la entropía en tiempo real
+        self.entrada_password.bind("<KeyRelease>", self.evaluar_fuerza_password)
 
         self.btn_generar = ctk.CTkButton(self.pass_frame, text="⚡ Gen", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, command=self.generar_password)
         self.btn_generar.grid(row=0, column=1, padx=(0, 5))
 
         self.btn_qr = ctk.CTkButton(self.pass_frame, text="🖨️ QR", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#F59E0B", text_color="#F59E0B", hover_color="#B45309", corner_radius=2, command=self.exportar_qr)
         self.btn_qr.grid(row=0, column=2)
+
+        # NUEVO: Indicador de fuerza de contraseña
+        self.lbl_fuerza_pass = ctk.CTkLabel(self.security_frame, text="ENTROPÍA: REQUERIDA", text_color="#4B5563", font=self.font_mono)
+        self.lbl_fuerza_pass.pack(pady=(2, 5))
 
         self.chk_mostrar_pass = ctk.CTkCheckBox(self.security_frame, text="Visibilidad", font=self.font_mono, text_color="#9CA3AF", fg_color="#00E5FF", hover_color="#00B3CC", corner_radius=2, checkbox_width=16, checkbox_height=16, border_width=1, command=self.toggle_password)
         self.chk_mostrar_pass.pack(pady=(5, 5))
@@ -197,7 +203,34 @@ class CryptoVaultApp(ctk.CTk):
         
         self.actualizar_consola_logs()
 
-    # --- FUNCIONES DE LA INTERFAZ ---
+    # --- LÓGICA DE EVALUACIÓN DE ENTROPÍA ---
+
+    def evaluar_fuerza_password(self, event=None):
+        """Analiza la complejidad de la clave ingresada en tiempo real"""
+        clave = self.entrada_password.get()
+        if not clave:
+            self.lbl_fuerza_pass.configure(text="ENTROPÍA: REQUERIDA", text_color="#4B5563")
+            return
+
+        # Análisis heurístico básico
+        longitud = len(clave)
+        tiene_mayus = any(c.isupper() for c in clave)
+        tiene_minus = any(c.islower() for c in clave)
+        tiene_num = any(c.isdigit() for c in clave)
+        tiene_esp = any(c in "!@#$%^&*()-_+=" for c in clave)
+
+        score = sum([tiene_mayus, tiene_minus, tiene_num, tiene_esp])
+
+        if longitud < 8 or score < 2:
+            self.lbl_fuerza_pass.configure(text="CRÍTICO: [ INSUFICIENTE ]", text_color="#EF4444")
+        elif longitud >= 14 and score == 4:
+            self.lbl_fuerza_pass.configure(text="VALIDADO: [ GRADO MILITAR ]", text_color="#00E5FF")
+        elif longitud >= 10 and score >= 3:
+            self.lbl_fuerza_pass.configure(text="ESTADO: [ ALTA SEGURIDAD ]", text_color="#10B981")
+        else:
+            self.lbl_fuerza_pass.configure(text="ESTADO: [ COMPLEJIDAD MEDIA ]", text_color="#F59E0B")
+
+    # --- RESTO DE FUNCIONES ---
 
     def generar_password(self):
         caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
@@ -207,14 +240,15 @@ class CryptoVaultApp(ctk.CTk):
         self.chk_mostrar_pass.select()
         self.entrada_password.configure(show="")
         
-        # Copiar de forma segura al portapapeles de Windows/Linux/Mac
         self.clipboard_clear()
         self.clipboard_append(password_segura)
         
         self.lbl_estado.configure(text="KEY EN PORTAPAPELES. DESTRUCCIÓN EN 20S.", text_color="#F59E0B")
-        logging.info("Master Key generada y volcada temporalmente al portapapeles del sistema.")
+        logging.info("Master Key segura generada mediante el generador interno.")
         
-        # Si ya había un temporizador activo, cancelarlo antes de lanzar el nuevo
+        # Disparar evaluación visual inmediatamente
+        self.evaluar_fuerza_password()
+        
         if self.timer_portapapeles and self.timer_portapapeles.is_alive():
             self.timer_portapapeles.cancel()
             
@@ -222,12 +256,11 @@ class CryptoVaultApp(ctk.CTk):
         self.timer_portapapeles.start()
 
     def purgar_portapapeles(self):
-        """Borra el contenido de la memoria del portapapeles de forma segura"""
         try:
             self.clipboard_clear()
             self.clipboard_append("")
             self.lbl_estado.configure(text="SYS_STATUS: PORTAPAPELES PURGADO.", text_color="#5C6B89")
-            logging.info("Portapapeles del sistema limpiado automáticamente por la política de retención temporal.")
+            logging.info("Portapapeles del sistema limpiado automáticamente por la política de retención.")
             self.actualizar_consola_logs()
         except Exception as e:
             logging.error(f"Error al purgar portapapeles: {e}")
@@ -256,7 +289,7 @@ class CryptoVaultApp(ctk.CTk):
                 logging.info(f"QR CODE | Respaldo fisico exportado a: {ruta_guardado}")
                 self.actualizar_consola_logs()
                 self.lbl_estado.configure(text="SYS_STATUS: PAPER WALLET EXPORTADA.", text_color="#F59E0B")
-                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.\n\nGuarda este archivo en un lugar seguro.")
+                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.")
             except Exception as e:
                 messagebox.showerror("SYS_ERR", f"Error al generar QR: {e}")
 
@@ -445,7 +478,6 @@ class CryptoVaultApp(ctk.CTk):
                     borrado_seguro(ruta)
                     procesados += 1
                 except InvalidToken:
-                    # Captura específica de error criptográfico (Firma o clave incorrecta)
                     errores += 1
                 except Exception:
                     errores += 1
@@ -510,6 +542,7 @@ class CryptoVaultApp(ctk.CTk):
         self.entrada_password.delete(0, 'end')
         self.chk_mostrar_pass.deselect()
         self.entrada_password.configure(show="*")
+        self.evaluar_fuerza_password() # Resetear indicador
 
 if __name__ == "__main__":
     app = CryptoVaultApp()
