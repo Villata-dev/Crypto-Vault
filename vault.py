@@ -6,6 +6,7 @@ import secrets
 import logging
 import hashlib
 import qrcode
+import time
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -66,14 +67,14 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V12.0 ---
+# --- INTERFAZ GRÁFICA V13.0 ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Crypto-Vault | Grado Militar")
-        self.geometry("500x880")
+        self.geometry("500x900")
         self.resizable(False, False)
         
         self.configure(fg_color="#0B0E14")
@@ -87,6 +88,10 @@ class CryptoVaultApp(ctk.CTk):
         self.intentos_fallidos = 0
         self.max_intentos = 3
         self.timer_portapapeles = None
+        
+        # SISTEMA DE TIMEOUT DE SESIÓN (180 segundos de inactividad)
+        self.limite_inactividad = 180 
+        self.ultimo_evento_tiempo = time.time()
 
         self.font_title = ctk.CTkFont(family="Consolas", size=26, weight="bold")
         self.font_bold = ctk.CTkFont(family="Consolas", size=13, weight="bold")
@@ -112,7 +117,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // ENTROPY ANALYZER", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // METRIC ANALYSIS", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -149,7 +154,6 @@ class CryptoVaultApp(ctk.CTk):
 
         self.entrada_password = ctk.CTkEntry(self.pass_frame, placeholder_text="master_key", show="*", width=150, height=35, font=self.font_mono, fg_color="#0F1219", border_color="#374151", corner_radius=2)
         self.entrada_password.grid(row=0, column=0, padx=(0, 5))
-        # Vincular el evento de teclado para analizar la entropía en tiempo real
         self.entrada_password.bind("<KeyRelease>", self.evaluar_fuerza_password)
 
         self.btn_generar = ctk.CTkButton(self.pass_frame, text="⚡ Gen", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, command=self.generar_password)
@@ -158,7 +162,6 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_qr = ctk.CTkButton(self.pass_frame, text="🖨️ QR", width=60, height=35, font=self.font_bold, fg_color="transparent", border_width=1, border_color="#F59E0B", text_color="#F59E0B", hover_color="#B45309", corner_radius=2, command=self.exportar_qr)
         self.btn_qr.grid(row=0, column=2)
 
-        # NUEVO: Indicador de fuerza de contraseña
         self.lbl_fuerza_pass = ctk.CTkLabel(self.security_frame, text="ENTROPÍA: REQUERIDA", text_color="#4B5563", font=self.font_mono)
         self.lbl_fuerza_pass.pack(pady=(2, 5))
 
@@ -201,24 +204,43 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_estado = ctk.CTkLabel(self, text="SYS_STATUS: INACTIVO", text_color="#4B5563", font=self.font_mono)
         self.lbl_estado.pack(side="bottom", pady=5)
         
-        self.actualizar_consola_logs()
+        # INTERCEPTAR ACTIVIDAD DE USUARIO EN LA VENTANA PARA EVITAR TIMEOUT
+        self.bind_all("<Any-KeyPress>", self.registrar_actividad)
+        self.bind_all("<Any-ButtonPress>", self.registrar_actividad)
 
-    # --- LÓGICA DE EVALUACIÓN DE ENTROPÍA ---
+        self.actualizar_consola_logs()
+        self.verificar_timeout_sesion()
+
+    # --- MONITOREO DE ACTIVIDAD DE SESIÓN ---
+
+    def registrar_actividad(self, event=None):
+        self.ultimo_evento_tiempo = time.time()
+
+    def verificar_timeout_sesion(self):
+        """Verifica recursivamente si la sesión ha expirado por inactividad física"""
+        if time.time() - self.ultimo_evento_tiempo > self.limite_inactividad:
+            if self.entrada_password.get() or self.ruta_target:
+                self.limpiar_ui()
+                logging.warning("SESSION TIMEOUT: Memoria volatil purgada y boveda bloqueada por inactividad.")
+                self.lbl_estado.configure(text="SESIÓN EXPIRADA POR INACTIVIDAD.", text_color="#EF4444")
+                self.actualizar_consola_logs()
+                messagebox.showwarning("SECURITY TIMEOUT", "La sesión local ha expirado. Toda la información en memoria ha sido purgada.")
+        
+        # Re-evaluar cada segundo de forma asíncrona en el loop de Tkinter
+        self.after(1000, self.verificar_timeout_sesion)
 
     def evaluar_fuerza_password(self, event=None):
-        """Analiza la complejidad de la clave ingresada en tiempo real"""
+        self.registrar_actividad()
         clave = self.entrada_password.get()
         if not clave:
             self.lbl_fuerza_pass.configure(text="ENTROPÍA: REQUERIDA", text_color="#4B5563")
             return
 
-        # Análisis heurístico básico
         longitud = len(clave)
         tiene_mayus = any(c.isupper() for c in clave)
         tiene_minus = any(c.islower() for c in clave)
         tiene_num = any(c.isdigit() for c in clave)
         tiene_esp = any(c in "!@#$%^&*()-_+=" for c in clave)
-
         score = sum([tiene_mayus, tiene_minus, tiene_num, tiene_esp])
 
         if longitud < 8 or score < 2:
@@ -230,9 +252,8 @@ class CryptoVaultApp(ctk.CTk):
         else:
             self.lbl_fuerza_pass.configure(text="ESTADO: [ COMPLEJIDAD MEDIA ]", text_color="#F59E0B")
 
-    # --- RESTO DE FUNCIONES ---
-
     def generar_password(self):
+        self.registrar_actividad()
         caracteres = string.ascii_letters + string.digits + "!@#$%^&*()-_+="
         password_segura = ''.join(secrets.choice(caracteres) for _ in range(16))
         self.entrada_password.delete(0, 'end')
@@ -242,11 +263,8 @@ class CryptoVaultApp(ctk.CTk):
         
         self.clipboard_clear()
         self.clipboard_append(password_segura)
-        
         self.lbl_estado.configure(text="KEY EN PORTAPAPELES. DESTRUCCIÓN EN 20S.", text_color="#F59E0B")
-        logging.info("Master Key segura generada mediante el generador interno.")
         
-        # Disparar evaluación visual inmediatamente
         self.evaluar_fuerza_password()
         
         if self.timer_portapapeles and self.timer_portapapeles.is_alive():
@@ -260,12 +278,13 @@ class CryptoVaultApp(ctk.CTk):
             self.clipboard_clear()
             self.clipboard_append("")
             self.lbl_estado.configure(text="SYS_STATUS: PORTAPAPELES PURGADO.", text_color="#5C6B89")
-            logging.info("Portapapeles del sistema limpiado automáticamente por la política de retención.")
+            logging.info("Portapapeles del sistema limpiado automáticamente.")
             self.actualizar_consola_logs()
         except Exception as e:
             logging.error(f"Error al purgar portapapeles: {e}")
 
     def exportar_qr(self):
+        self.registrar_actividad()
         clave = self.entrada_password.get()
         if not clave:
             messagebox.showwarning("SYS_WARN", "Genera o ingresa una master_key primero.")
@@ -274,10 +293,9 @@ class CryptoVaultApp(ctk.CTk):
         ruta_guardado = filedialog.asksaveasfilename(
             defaultextension=".png", 
             initialfile="vault_recovery_key.png",
-            title="Exportar QR Code (Paper Wallet)",
+            title="Exportar QR Code",
             filetypes=[("Imágenes PNG", "*.png")]
         )
-        
         if ruta_guardado:
             try:
                 qr = qrcode.QRCode(version=1, box_size=10, border=4)
@@ -285,33 +303,33 @@ class CryptoVaultApp(ctk.CTk):
                 qr.make(fit=True)
                 img = qr.make_image(fill_color="black", back_color="white")
                 img.save(ruta_guardado)
-                
-                logging.info(f"QR CODE | Respaldo fisico exportado a: {ruta_guardado}")
+                logging.info(f"QR CODE | Respaldo exportado a: {ruta_guardado}")
                 self.actualizar_consola_logs()
-                self.lbl_estado.configure(text="SYS_STATUS: PAPER WALLET EXPORTADA.", text_color="#F59E0B")
-                messagebox.showinfo("COLD STORAGE", f"Código QR generado exitosamente.")
+                messagebox.showinfo("COLD STORAGE", "Código QR generado exitosamente.")
             except Exception as e:
                 messagebox.showerror("SYS_ERR", f"Error al generar QR: {e}")
 
     def ejecutar_checksum(self):
+        self.registrar_actividad()
         if not self.ruta_target or self.es_carpeta:
-            messagebox.showwarning("SYS_WARN", "Selecciona un archivo individual para calcular su firma hash.")
+            messagebox.showwarning("SYS_WARN", "Selecciona un archivo individual.")
             return
         
         def tarea_hash():
             self.lbl_estado.configure(text="SYS_STATUS: CALCULANDO VALOR HASH...", text_color="#10B981")
             firma = calcular_hash_sha256(self.ruta_target)
             if firma:
-                logging.info(f"INTEGRITY CHECK | Archivo: {os.path.basename(self.ruta_target)} | SHA-256: {firma}")
+                logging.info(f"INTEGRITY CHECK | SHA-256: {firma}")
                 self.actualizar_consola_logs()
                 self.lbl_estado.configure(text=f"SHA-256: {firma[:16]}...", text_color="#00E5FF")
-                messagebox.showinfo("INTEGRITY CHECK", f"Firma SHA-256 calculada:\n\n{firma}")
+                messagebox.showinfo("INTEGRITY CHECK", f"Firma SHA-256:\n\n{firma}")
             else:
                 self.lbl_estado.configure(text="SYS_STATUS: ERROR AL CALCULAR HASH", text_color="#DC2626")
 
         threading.Thread(target=tarea_hash, daemon=True).start()
 
     def toggle_consola_logs(self):
+        self.registrar_actividad()
         if self.txt_consola.winfo_manager():
             self.txt_consola.pack_forget()
         else:
@@ -336,24 +354,28 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_status_avanzado.configure(text=f"[ 2FA: {kf_status} ] | [ STEGO: {st_status} ]", text_color=color)
 
     def seleccionar_keyfile(self):
+        self.registrar_actividad()
         ruta = filedialog.askopenfilename(title="Selecciona Keyfile")
         if ruta:
             self.ruta_keyfile = ruta
             self.actualizar_status_avanzado()
 
     def seleccionar_portador(self):
-        ruta = filedialog.askopenfilename(title="Selecciona Portador (JPG/PNG)", filetypes=[("Imágenes", "*.jpg *.jpeg *.png")])
+        self.registrar_actividad()
+        ruta = filedialog.askopenfilename(title="Selecciona Portador", filetypes=[("Imágenes", "*.jpg *.jpeg *.png")])
         if ruta:
             self.ruta_portador = ruta
             self.actualizar_status_avanzado()
 
     def toggle_password(self):
+        self.registrar_actividad()
         if self.chk_mostrar_pass.get() == 1:
             self.entrada_password.configure(show="")
         else:
             self.entrada_password.configure(show="*")
 
     def seleccionar_target(self, tipo):
+        self.registrar_actividad()
         if tipo == "archivo":
             ruta = filedialog.askopenfilename(title="Selecciona target")
             self.es_carpeta = False
@@ -366,6 +388,10 @@ class CryptoVaultApp(ctk.CTk):
             nombre_corto = os.path.basename(ruta)
             prefijo = "[DIR]" if self.es_carpeta else "[FILE]"
             self.lbl_archivo.configure(text=f">_ {prefijo} {nombre_corto}", text_color="#00E5FF")
+
+    def prevenir_brickeo_sistema(self, ruta_archivo):
+        _, ext = os.path.splitext(ruta_archivo.lower())
+        return ext in EXTENSIONS_BLACKLIST
 
     def prevenir_brickeo_sistema(self, ruta_archivo):
         _, ext = os.path.splitext(ruta_archivo.lower())
@@ -399,17 +425,19 @@ class CryptoVaultApp(ctk.CTk):
                     else:
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             if self.prevenir_brickeo_sistema(ruta_completa):
-                                logging.warning(f"OS PROTECTION: Archivo omitido -> {ruta_completa}")
+                                logging.warning(f"OS PROTECTION: Omitido -> {ruta_completa}")
                                 continue
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
+
+    # --- LÓGICA BATCH CON CÁCULO DE RENDIMIENTO Y ETA ---
 
     def iniciar_cifrado(self):
         if not self.validar_entradas(): return
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: PROCESANDO DATOS...", text_color="#00E5FF")
+        self.lbl_estado.configure(text="SYS_STATUS: CALIBRANDO BATCH...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_cifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile, self.ruta_portador), daemon=True).start()
 
     def tarea_cifrar_batch(self, password, keyfile, portador):
@@ -417,13 +445,20 @@ class CryptoVaultApp(ctk.CTk):
             archivos = self.obtener_lista_archivos(es_descifrado=False)
             if not archivos:
                 raise Exception("No se encontraron archivos seguros para encriptar.")
+            
+            total_archivos = len(archivos)
+            tiempo_inicio = time.time()
+            bytes_totales_procesados = 0
                 
-            for ruta in archivos:
+            for idx, ruta in enumerate(archivos, start=1):
+                tamano_archivo = os.path.getsize(ruta)
                 salt = os.urandom(16)
                 llave = generar_llave_desde_password(password, salt, keyfile)
                 f = Fernet(llave)
+                
                 with open(ruta, "rb") as archivo:
                     datos_originales = archivo.read()
+                
                 datos_cifrados = f.encrypt(datos_originales)
                 payload_seguro = salt + datos_cifrados
 
@@ -435,9 +470,24 @@ class CryptoVaultApp(ctk.CTk):
                 else:
                     with open(ruta + ".enc", "wb") as archivo_cifrado:
                         archivo_cifrado.write(payload_seguro)
+                
                 borrado_seguro(ruta)
+                
+                # CÁLCULO MÉTRICO EN TIEMPO REAL
+                bytes_totales_procesados += tamano_archivo
+                tiempo_transcurrido = time.time() - tiempo_inicio
+                velocidad = (bytes_totales_procesados / 1024 / 1024) / (tiempo_transcurrido if tiempo_transcurrido > 0 else 0.001)
+                
+                archivos_restantes = total_archivos - idx
+                tiempo_promedio_por_archivo = tiempo_transcurrido / idx
+                eta = archivos_restantes * tiempo_promedio_por_archivo
+                
+                self.lbl_estado.configure(
+                    text=f"BATCH: {idx}/{total_archivos} | {velocidad:.2f} MB/s | ETA: {eta:.1f}s", 
+                    text_color="#00E5FF"
+                )
             
-            self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {len(archivos)} ARCHIVOS", True, "")
+            self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {total_archivos} ARCHIVOS", True, "")
         except Exception as e:
             self.after(500, self.finalizar_operacion, "ERROR ENCRIPTACION", False, str(e))
 
@@ -446,16 +496,21 @@ class CryptoVaultApp(ctk.CTk):
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: VALIDANDO CREDENCIALES...", text_color="#00E5FF")
+        self.lbl_estado.configure(text="SYS_STATUS: CALIBRANDO BATCH...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_descifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile, self.switch_autodestruccion.get()), daemon=True).start()
 
     def tarea_descifrar_batch(self, password, keyfile, autodestruccion_activa):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=True)
+            if not archivos:
+                raise Exception("No se encontraron archivos válidos para descifrar.")
+
             errores = 0
             procesados = 0
+            total_archivos = len(archivos)
+            tiempo_inicio = time.time()
 
-            for ruta in archivos:
+            for idx, ruta in enumerate(archivos, start=1):
                 try:
                     with open(ruta, "rb") as target_file:
                         contenido = target_file.read()
@@ -477,10 +532,13 @@ class CryptoVaultApp(ctk.CTk):
 
                     borrado_seguro(ruta)
                     procesados += 1
-                except InvalidToken:
-                    errores += 1
                 except Exception:
                     errores += 1
+                
+                tiempo_transcurrido = time.time() - tiempo_inicio
+                tiempo_promedio = tiempo_transcurrido / idx
+                eta = (total_archivos - idx) * tiempo_promedio
+                self.lbl_estado.configure(text=f"BATCH DESCIFRADO: {idx}/{total_archivos} | ETA: {eta:.1f}s", text_color="#10B981")
             
             if errores > 0 and procesados == 0:
                 self.intentos_fallidos += 1
@@ -491,11 +549,10 @@ class CryptoVaultApp(ctk.CTk):
                     self.intentos_fallidos = 0
                     self.after(500, self.finalizar_operacion, "AUTO-DESTRUCCIÓN", False, "Protocolo de panico ejecutado. Datos purgados.")
                     return
-
                 msg_error = f"Credenciales invalidas. Intento {self.intentos_fallidos}/{self.max_intentos}."
                 self.after(500, self.finalizar_operacion, "ACCESO DENEGADO", False, msg_error)
             elif errores > 0:
-                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} fallas detectadas.")
+                self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} fallas.")
             else:
                 self.intentos_fallidos = 0
                 self.after(500, self.finalizar_operacion, f"DESENCRIPTADOS {procesados} ARCHIVOS", True, "")
@@ -516,12 +573,13 @@ class CryptoVaultApp(ctk.CTk):
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion} EXITOSAMENTE.", text_color="#10B981")
             messagebox.showinfo("SYS_MSG", f"Operación completada: {operacion}.")
         else:
-            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | Estado: FALLIDO | Causa: {error_msg}")
+            logging.error(f"Operacion: {operacion} | Target: {target_registrado} | Causa: {error_msg}")
             color = "#991B1B" if "DESTRUCCIÓN" in operacion else "#DC2626"
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color)
             messagebox.showerror("SYS_ERR", error_msg)
         
         self.actualizar_consola_logs()
+        self.registrar_actividad()
 
     def validar_entradas(self, es_descifrado=False):
         if not self.ruta_target:
@@ -542,7 +600,7 @@ class CryptoVaultApp(ctk.CTk):
         self.entrada_password.delete(0, 'end')
         self.chk_mostrar_pass.deselect()
         self.entrada_password.configure(show="*")
-        self.evaluar_fuerza_password() # Resetear indicador
+        self.evaluar_fuerza_password()
 
 if __name__ == "__main__":
     app = CryptoVaultApp()
