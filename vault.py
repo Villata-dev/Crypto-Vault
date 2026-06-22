@@ -7,6 +7,7 @@ import logging
 import hashlib
 import qrcode
 import time
+import fnmatch
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -23,6 +24,7 @@ logging.basicConfig(
 )
 
 STEGO_SEPARATOR = b"||CV_STEGO_PAYLOAD||"
+# Reglas globales fijas del sistema operativo
 EXTENSIONS_BLACKLIST = ['.exe', '.dll', '.sys', '.ini', '.lnk', '.bat', '.msi', '.reg']
 
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
@@ -67,7 +69,7 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V13.0 ---
+# --- INTERFAZ GRÁFICA V14.0 ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -89,7 +91,6 @@ class CryptoVaultApp(ctk.CTk):
         self.max_intentos = 3
         self.timer_portapapeles = None
         
-        # SISTEMA DE TIMEOUT DE SESIÓN (180 segundos de inactividad)
         self.limite_inactividad = 180 
         self.ultimo_evento_tiempo = time.time()
 
@@ -117,7 +118,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // METRIC ANALYSIS", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // PATTERN FILTRATION", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -204,7 +205,6 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_estado = ctk.CTkLabel(self, text="SYS_STATUS: INACTIVO", text_color="#4B5563", font=self.font_mono)
         self.lbl_estado.pack(side="bottom", pady=5)
         
-        # INTERCEPTAR ACTIVIDAD DE USUARIO EN LA VENTANA PARA EVITAR TIMEOUT
         self.bind_all("<Any-KeyPress>", self.registrar_actividad)
         self.bind_all("<Any-ButtonPress>", self.registrar_actividad)
 
@@ -217,7 +217,6 @@ class CryptoVaultApp(ctk.CTk):
         self.ultimo_evento_tiempo = time.time()
 
     def verificar_timeout_sesion(self):
-        """Verifica recursivamente si la sesión ha expirado por inactividad física"""
         if time.time() - self.ultimo_evento_tiempo > self.limite_inactividad:
             if self.entrada_password.get() or self.ruta_target:
                 self.limpiar_ui()
@@ -225,8 +224,6 @@ class CryptoVaultApp(ctk.CTk):
                 self.lbl_estado.configure(text="SESIÓN EXPIRADA POR INACTIVIDAD.", text_color="#EF4444")
                 self.actualizar_consola_logs()
                 messagebox.showwarning("SECURITY TIMEOUT", "La sesión local ha expirado. Toda la información en memoria ha sido purgada.")
-        
-        # Re-evaluar cada segundo de forma asíncrona en el loop de Tkinter
         self.after(1000, self.verificar_timeout_sesion)
 
     def evaluar_fuerza_password(self, event=None):
@@ -393,10 +390,6 @@ class CryptoVaultApp(ctk.CTk):
         _, ext = os.path.splitext(ruta_archivo.lower())
         return ext in EXTENSIONS_BLACKLIST
 
-    def prevenir_brickeo_sistema(self, ruta_archivo):
-        _, ext = os.path.splitext(ruta_archivo.lower())
-        return ext in EXTENSIONS_BLACKLIST
-
     def bloquear_ui(self, bloqueado: bool):
         estado = "disabled" if bloqueado else "normal"
         self.btn_cifrar.configure(state=estado)
@@ -411,22 +404,62 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_checksum.configure(state=estado)
         self.btn_qr.configure(state=estado)
 
+    # --- MOTOR DE FILTRADO CON REGLAS RECURSIVAS (.vaultignore) ---
+
+    def cargar_patrones_ignore(self, ruta_raiz):
+        """Busca y parsea un archivo .vaultignore en el directorio raíz"""
+        patrones = []
+        ruta_ignore = os.path.join(ruta_raiz, ".vaultignore")
+        if os.path.exists(ruta_ignore):
+            try:
+                with open(ruta_ignore, "r", encoding="utf-8") as f:
+                    for linea in f:
+                        linea = linea.strip()
+                        # Ignorar comentarios y líneas vacías
+                        if linea and not linea.startswith("#"):
+                            patrones.append(linea)
+                logging.info(f"IGNORE ENGINE: Cargadas {len(patrones)} reglas desde .vaultignore")
+            except Exception as e:
+                logging.error(f"Error leyendo .vaultignore: {e}")
+        return patrones
+
     def obtener_lista_archivos(self, es_descifrado=False):
         archivos_a_procesar = []
         if not self.es_carpeta:
             archivos_a_procesar.append(self.ruta_target)
         else:
+            # Cargar dinámicamente las reglas de exclusión si existen
+            patrones_ignore = self.cargar_patrones_ignore(self.ruta_target)
+            
             for raiz, _, archivos in os.walk(self.ruta_target):
                 for arch in archivos:
                     ruta_completa = os.path.join(raiz, arch)
+                    
+                    # Generar ruta relativa para evaluar los patrones
+                    ruta_relativa = os.path.relpath(ruta_completa, self.ruta_target)
+                    ruta_relativa_unix = ruta_relativa.replace("\\", "/") # Normalizar para concordancia estándar
+
                     if es_descifrado:
                         if ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
                     else:
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
+                            # 1. Filtro del Sistema Operativo (Blacklist fija)
                             if self.prevenir_brickeo_sistema(ruta_completa):
                                 logging.warning(f"OS PROTECTION: Omitido -> {ruta_completa}")
                                 continue
+                            
+                            # 2. Filtro de Reglas Personalizadas (.vaultignore)
+                            ignorar = False
+                            for patron in patrones_ignore:
+                                if fnmatch.fnmatch(ruta_relativa_unix, patron) or fnmatch.fnmatch(arch, patron):
+                                    ignorar = True
+                                    break
+                            
+                            if ignorar:
+                                logging.info(f"IGNORE ENGINE: Omitido por patron -> {ruta_relativa_unix}")
+                                continue
+                                
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
 
@@ -444,7 +477,7 @@ class CryptoVaultApp(ctk.CTk):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=False)
             if not archivos:
-                raise Exception("No se encontraron archivos seguros para encriptar.")
+                raise Exception("No se encontraron archivos seguros para encriptar o todos fueron omitidos por los filtros.")
             
             total_archivos = len(archivos)
             tiempo_inicio = time.time()
@@ -473,7 +506,6 @@ class CryptoVaultApp(ctk.CTk):
                 
                 borrado_seguro(ruta)
                 
-                # CÁLCULO MÉTRICO EN TIEMPO REAL
                 bytes_totales_procesados += tamano_archivo
                 tiempo_transcurrido = time.time() - tiempo_inicio
                 velocidad = (bytes_totales_procesados / 1024 / 1024) / (tiempo_transcurrido if tiempo_transcurrido > 0 else 0.001)
