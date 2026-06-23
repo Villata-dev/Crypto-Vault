@@ -8,6 +8,8 @@ import hashlib
 import qrcode
 import time
 import fnmatch
+import json
+import zlib
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet
@@ -24,8 +26,8 @@ logging.basicConfig(
 )
 
 STEGO_SEPARATOR = b"||CV_STEGO_PAYLOAD||"
-# Reglas globales fijas del sistema operativo
 EXTENSIONS_BLACKLIST = ['.exe', '.dll', '.sys', '.ini', '.lnk', '.bat', '.msi', '.reg']
+CONFIG_FILE = "vault_config.json"
 
 # --- LÓGICA CRIPTOGRÁFICA Y DE SEGURIDAD ---
 
@@ -69,7 +71,7 @@ def calcular_hash_sha256(ruta_archivo):
     except Exception:
         return None
 
-# --- INTERFAZ GRÁFICA V14.0 ---
+# --- INTERFAZ GRÁFICA V15.0 ---
 
 class CryptoVaultApp(ctk.CTk):
     def __init__(self):
@@ -118,7 +120,7 @@ class CryptoVaultApp(ctk.CTk):
         self.lbl_corchete_der = ctk.CTkLabel(self.title_frame, text=" ]", font=self.font_title, text_color="#00E5FF")
         self.lbl_corchete_der.pack(side="left")
         
-        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // PATTERN FILTRATION", text_color="#5C6B89", font=self.font_mono)
+        self.lbl_subtitulo = ctk.CTkLabel(self.main_frame, text="MOTOR AES-256 // COMPRESSED PAYLOADS", text_color="#5C6B89", font=self.font_mono)
         self.lbl_subtitulo.pack(pady=(0, 10))
 
         # --- SECCIÓN DE TARGET ---
@@ -137,7 +139,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_sel_carpeta = ctk.CTkButton(self.btn_select_frame, text="Carpeta", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#8B5CF6", text_color="#8B5CF6", hover_color="#4C1D95", corner_radius=2, width=90, command=lambda: self.seleccionar_target(tipo="carpeta"))
         self.btn_sel_carpeta.grid(row=0, column=1, padx=3)
 
-        self.btn_checksum = ctk.CTkButton(self.btn_select_frame, text="SHA-256", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", corner_radius=2, width=90, command=self.ejecutar_checksum)
+        self.btn_checksum = ctk.CTkButton(self.btn_select_frame, text="SHA-256", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", hover_color="#064E3B", corner_radius=2, width=90, command=self.checksum_wrapper)
         self.btn_checksum.grid(row=0, column=2, padx=3)
 
         self.lbl_archivo = ctk.CTkLabel(self.file_frame, text=">_ Esperando target...", text_color="#4B5563", font=self.font_mono, wraplength=400)
@@ -178,7 +180,7 @@ class CryptoVaultApp(ctk.CTk):
         self.btn_portador = ctk.CTkButton(self.tools_frame, text="🖼️ Portador", font=self.font_bold, fg_color="transparent", border_width=1, border_color="#EC4899", text_color="#EC4899", hover_color="#BE185D", corner_radius=2, width=120, command=self.seleccionar_portador)
         self.btn_portador.grid(row=0, column=1, padx=5)
         
-        self.switch_autodestruccion = ctk.CTkSwitch(self.security_frame, text="💣 Protocolo Auto-Destrucción", font=self.font_bold, text_color="#EF4444", progress_color="#EF4444", button_color="#7F1D1D", button_hover_color="#991B1B")
+        self.switch_autodestruccion = ctk.CTkSwitch(self.security_frame, text="💣 Protocolo Auto-Destrucción", font=self.font_bold, text_color="#EF4444", progress_color="#EF4444", button_color="#7F1D1D", button_hover_color="#991B1B", command=self.guardar_configuracion_local)
         self.switch_autodestruccion.pack(pady=(5, 5))
 
         self.lbl_status_avanzado = ctk.CTkLabel(self.security_frame, text="[ 2FA: OFF ] | [ STEGO: OFF ]", text_color="#4B5563", font=self.font_mono)
@@ -208,10 +210,39 @@ class CryptoVaultApp(ctk.CTk):
         self.bind_all("<Any-KeyPress>", self.registrar_actividad)
         self.bind_all("<Any-ButtonPress>", self.registrar_actividad)
 
+        # CAPA DE PERSISTENCIA: Cargar estados anteriores antes de renderizar
+        self.cargar_configuracion_local()
         self.actualizar_consola_logs()
         self.verificar_timeout_sesion()
 
-    # --- MONITOREO DE ACTIVIDAD DE SESIÓN ---
+    # --- CAPA DE PERSISTENCIA JSON ---
+
+    def cargar_configuracion_local(self):
+        """Carga dinámicamente las configuraciones guardadas en JSON"""
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                if config.get("autodestruccion") == 1:
+                    self.switch_autodestruccion.select()
+                else:
+                    self.switch_autodestruccion.deselect()
+                logging.info("PERSISTENCE: Preferencias de interfaz cargadas desde el almacenamiento local.")
+            except Exception as e:
+                logging.error(f"Error cargando archivo de configuracion: {e}")
+
+    def guardar_configuracion_local(self):
+        """Serializa y guarda las configuraciones en caliente"""
+        config = {
+            "autodestruccion": self.switch_autodestruccion.get()
+        }
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            logging.error(f"Error guardando archivo de configuracion: {e}")
+
+    # --- SEGURIDAD DE SESIÓN ---
 
     def registrar_actividad(self, event=None):
         self.ultimo_evento_tiempo = time.time()
@@ -220,10 +251,10 @@ class CryptoVaultApp(ctk.CTk):
         if time.time() - self.ultimo_evento_tiempo > self.limite_inactividad:
             if self.entrada_password.get() or self.ruta_target:
                 self.limpiar_ui()
-                logging.warning("SESSION TIMEOUT: Memoria volatil purgada y boveda bloqueada por inactividad.")
+                logging.warning("SESSION TIMEOUT: Memoria volatil purgada de forma preventiva.")
                 self.lbl_estado.configure(text="SESIÓN EXPIRADA POR INACTIVIDAD.", text_color="#EF4444")
                 self.actualizar_consola_logs()
-                messagebox.showwarning("SECURITY TIMEOUT", "La sesión local ha expirado. Toda la información en memoria ha sido purgada.")
+                messagebox.showwarning("SECURITY TIMEOUT", "Acceso suspendido por inactividad. Memoria purgada.")
         self.after(1000, self.verificar_timeout_sesion)
 
     def evaluar_fuerza_password(self, event=None):
@@ -275,7 +306,7 @@ class CryptoVaultApp(ctk.CTk):
             self.clipboard_clear()
             self.clipboard_append("")
             self.lbl_estado.configure(text="SYS_STATUS: PORTAPAPELES PURGADO.", text_color="#5C6B89")
-            logging.info("Portapapeles del sistema limpiado automáticamente.")
+            logging.info("Portapapeles limpiado automáticamente.")
             self.actualizar_consola_logs()
         except Exception as e:
             logging.error(f"Error al purgar portapapeles: {e}")
@@ -306,7 +337,7 @@ class CryptoVaultApp(ctk.CTk):
             except Exception as e:
                 messagebox.showerror("SYS_ERR", f"Error al generar QR: {e}")
 
-    def ejecutar_checksum(self):
+    def checksum_wrapper(self):
         self.registrar_actividad()
         if not self.ruta_target or self.es_carpeta:
             messagebox.showwarning("SYS_WARN", "Selecciona un archivo individual.")
@@ -390,24 +421,21 @@ class CryptoVaultApp(ctk.CTk):
         _, ext = os.path.splitext(ruta_archivo.lower())
         return ext in EXTENSIONS_BLACKLIST
 
-    def bloquear_ui(self, bloqueado: bool):
-        estado = "disabled" if bloqueado else "normal"
-        self.btn_cifrar.configure(state=estado)
-        self.btn_descifrar.configure(state=estado)
-        self.btn_sel_archivo.configure(state=estado)
-        self.btn_sel_carpeta.configure(state=estado)
-        self.btn_generar.configure(state=estado)
-        self.btn_keyfile.configure(state=estado)
-        self.btn_portador.configure(state=estado)
-        self.switch_autodestruccion.configure(state=estado)
-        self.btn_logs.configure(state=estado)
-        self.btn_checksum.configure(state=estado)
-        self.btn_qr.configure(state=estado)
-
-    # --- MOTOR DE FILTRADO CON REGLAS RECURSIVAS (.vaultignore) ---
+    def bloquear_ui(self, bool_val):
+        state = "disabled" if bool_val else "normal"
+        self.btn_cifrar.configure(state=state)
+        self.btn_descifrar.configure(state=state)
+        self.btn_sel_archivo.configure(state=state)
+        self.btn_sel_carpeta.configure(state=state)
+        self.btn_generar.configure(state=state)
+        self.btn_keyfile.configure(state=state)
+        self.btn_portador.configure(state=state)
+        self.switch_autodestruccion.configure(state=state)
+        self.btn_logs.configure(state=state)
+        self.btn_checksum.configure(state=state)
+        self.btn_qr.configure(state=state)
 
     def cargar_patrones_ignore(self, ruta_raiz):
-        """Busca y parsea un archivo .vaultignore en el directorio raíz"""
         patrones = []
         ruta_ignore = os.path.join(ruta_raiz, ".vaultignore")
         if os.path.exists(ruta_ignore):
@@ -415,10 +443,8 @@ class CryptoVaultApp(ctk.CTk):
                 with open(ruta_ignore, "r", encoding="utf-8") as f:
                     for linea in f:
                         linea = linea.strip()
-                        # Ignorar comentarios y líneas vacías
                         if linea and not linea.startswith("#"):
                             patrones.append(linea)
-                logging.info(f"IGNORE ENGINE: Cargadas {len(patrones)} reglas desde .vaultignore")
             except Exception as e:
                 logging.error(f"Error leyendo .vaultignore: {e}")
         return patrones
@@ -428,56 +454,40 @@ class CryptoVaultApp(ctk.CTk):
         if not self.es_carpeta:
             archivos_a_procesar.append(self.ruta_target)
         else:
-            # Cargar dinámicamente las reglas de exclusión si existen
             patrones_ignore = self.cargar_patrones_ignore(self.ruta_target)
-            
             for raiz, _, archivos in os.walk(self.ruta_target):
                 for arch in archivos:
                     ruta_completa = os.path.join(raiz, arch)
-                    
-                    # Generar ruta relativa para evaluar los patrones
-                    ruta_relativa = os.path.relpath(ruta_completa, self.ruta_target)
-                    ruta_relativa_unix = ruta_relativa.replace("\\", "/") # Normalizar para concordancia estándar
+                    ruta_relativa = os.path.relpath(ruta_completa, self.ruta_target).replace("\\", "/")
 
                     if es_descifrado:
                         if ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
                             archivos_a_procesar.append(ruta_completa)
                     else:
                         if not ruta_completa.endswith((".enc", ".png", ".jpg", ".jpeg")):
-                            # 1. Filtro del Sistema Operativo (Blacklist fija)
-                            if self.prevenir_brickeo_sistema(ruta_completa):
-                                logging.warning(f"OS PROTECTION: Omitido -> {ruta_completa}")
-                                continue
-                            
-                            # 2. Filtro de Reglas Personalizadas (.vaultignore)
+                            if self.prevenir_brickeo_sistema(ruta_completa): continue
                             ignorar = False
                             for patron in patrones_ignore:
-                                if fnmatch.fnmatch(ruta_relativa_unix, patron) or fnmatch.fnmatch(arch, patron):
+                                if fnmatch.fnmatch(ruta_relativa, patron) or fnmatch.fnmatch(arch, patron):
                                     ignorar = True
                                     break
-                            
-                            if ignorar:
-                                logging.info(f"IGNORE ENGINE: Omitido por patron -> {ruta_relativa_unix}")
-                                continue
-                                
+                            if ignorar: continue
                             archivos_a_procesar.append(ruta_completa)
         return archivos_a_procesar
 
-    # --- LÓGICA BATCH CON CÁCULO DE RENDIMIENTO Y ETA ---
+    # --- ENCRIPTACIÓN OPTIMIZADA CON COMPRESIÓN ZLIB ---
 
     def iniciar_cifrado(self):
         if not self.validar_entradas(): return
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: CALIBRANDO BATCH...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_cifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile, self.ruta_portador), daemon=True).start()
 
     def tarea_cifrar_batch(self, password, keyfile, portador):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=False)
-            if not archivos:
-                raise Exception("No se encontraron archivos seguros para encriptar o todos fueron omitidos por los filtros.")
+            if not archivos: raise Exception("No se encontraron archivos targets validos.")
             
             total_archivos = len(archivos)
             tiempo_inicio = time.time()
@@ -492,7 +502,9 @@ class CryptoVaultApp(ctk.CTk):
                 with open(ruta, "rb") as archivo:
                     datos_originales = archivo.read()
                 
-                datos_cifrados = f.encrypt(datos_originales)
+                # OPTIMIZACIÓN: Compresión de datos crudos antes de cifrar
+                datos_comprimidos = zlib.compress(datos_originales, level=6)
+                datos_cifrados = f.encrypt(datos_comprimidos)
                 payload_seguro = salt + datos_cifrados
 
                 if portador:
@@ -509,15 +521,9 @@ class CryptoVaultApp(ctk.CTk):
                 bytes_totales_procesados += tamano_archivo
                 tiempo_transcurrido = time.time() - tiempo_inicio
                 velocidad = (bytes_totales_procesados / 1024 / 1024) / (tiempo_transcurrido if tiempo_transcurrido > 0 else 0.001)
+                eta = (total_archivos - idx) * (tiempo_transcurrido / idx)
                 
-                archivos_restantes = total_archivos - idx
-                tiempo_promedio_por_archivo = tiempo_transcurrido / idx
-                eta = archivos_restantes * tiempo_promedio_por_archivo
-                
-                self.lbl_estado.configure(
-                    text=f"BATCH: {idx}/{total_archivos} | {velocidad:.2f} MB/s | ETA: {eta:.1f}s", 
-                    text_color="#00E5FF"
-                )
+                self.lbl_estado.configure(text=f"BATCH: {idx}/{total_archivos} | {velocidad:.2f} MB/s | ETA: {eta:.1f}s")
             
             self.after(500, self.finalizar_operacion, f"ENCRIPTADOS {total_archivos} ARCHIVOS", True, "")
         except Exception as e:
@@ -528,14 +534,12 @@ class CryptoVaultApp(ctk.CTk):
         self.bloquear_ui(True)
         self.progressbar.pack(pady=(0, 5))
         self.progressbar.start()
-        self.lbl_estado.configure(text="SYS_STATUS: CALIBRANDO BATCH...", text_color="#00E5FF")
         threading.Thread(target=self.tarea_descifrar_batch, args=(self.entrada_password.get(), self.ruta_keyfile, self.switch_autodestruccion.get()), daemon=True).start()
 
     def tarea_descifrar_batch(self, password, keyfile, autodestruccion_activa):
         try:
             archivos = self.obtener_lista_archivos(es_descifrado=True)
-            if not archivos:
-                raise Exception("No se encontraron archivos válidos para descifrar.")
+            if not archivos: raise Exception("No se encontraron archivos validos.")
 
             errores = 0
             procesados = 0
@@ -556,7 +560,10 @@ class CryptoVaultApp(ctk.CTk):
                     datos_cifrados = payload[16:]
                     llave = generar_llave_desde_password(password, salt, keyfile)
                     f = Fernet(llave)
-                    datos_descifrados = f.decrypt(datos_cifrados)
+                    
+                    datos_cifrados_dec = f.decrypt(datos_cifrados)
+                    # DECOMPRESIÓN: Reconstruir archivo crudo
+                    datos_descifrados = zlib.decompress(datos_cifrados_dec)
 
                     nombre_original = ruta.replace("_secure.png", "").replace(".enc", "")
                     with open(nombre_original, "wb") as archivo_descifrado:
@@ -567,22 +574,18 @@ class CryptoVaultApp(ctk.CTk):
                 except Exception:
                     errores += 1
                 
-                tiempo_transcurrido = time.time() - tiempo_inicio
-                tiempo_promedio = tiempo_transcurrido / idx
-                eta = (total_archivos - idx) * tiempo_promedio
-                self.lbl_estado.configure(text=f"BATCH DESCIFRADO: {idx}/{total_archivos} | ETA: {eta:.1f}s", text_color="#10B981")
+                eta = (total_archivos - idx) * ((time.time() - tiempo_inicio) / idx)
+                self.lbl_estado.configure(text=f"BATCH DESCIFRADO: {idx}/{total_archivos} | ETA: {eta:.1f}s")
             
             if errores > 0 and procesados == 0:
                 self.intentos_fallidos += 1
                 if autodestruccion_activa == 1 and self.intentos_fallidos >= self.max_intentos:
-                    for ruta in archivos:
-                        borrado_seguro(ruta)
-                    logging.critical("PANIC MODE TRIGGERED: DATA DESTRUIDA POR EXCESO DE INTENTOS.")
+                    for ruta in archivos: borrado_seguro(ruta)
+                    logging.critical("PANIC MODE TRIGGERED: DATA ANIQUILADA.")
                     self.intentos_fallidos = 0
-                    self.after(500, self.finalizar_operacion, "AUTO-DESTRUCCIÓN", False, "Protocolo de panico ejecutado. Datos purgados.")
+                    self.after(500, self.finalizar_operacion, "AUTO-DESTRUCCIÓN", False, "Protocolo ejecutado. Datos purgados.")
                     return
-                msg_error = f"Credenciales invalidas. Intento {self.intentos_fallidos}/{self.max_intentos}."
-                self.after(500, self.finalizar_operacion, "ACCESO DENEGADO", False, msg_error)
+                self.after(500, self.finalizar_operacion, "ACCESO DENEGADO", False, f"Credenciales invalidas. Intento {self.intentos_fallidos}/{self.max_intentos}.")
             elif errores > 0:
                 self.after(500, self.finalizar_operacion, "ADVERTENCIA", False, f"Proceso parcial. {errores} fallas.")
             else:
@@ -595,7 +598,6 @@ class CryptoVaultApp(ctk.CTk):
         self.progressbar.stop()
         self.progressbar.pack_forget()
         self.bloquear_ui(False)
-        
         target_registrado = self.ruta_target
         usando_2fa = "SI" if self.ruta_keyfile else "NO"
 
@@ -609,7 +611,6 @@ class CryptoVaultApp(ctk.CTk):
             color = "#991B1B" if "DESTRUCCIÓN" in operacion else "#DC2626"
             self.lbl_estado.configure(text=f"SYS_STATUS: {operacion}", text_color=color)
             messagebox.showerror("SYS_ERR", error_msg)
-        
         self.actualizar_consola_logs()
         self.registrar_actividad()
 

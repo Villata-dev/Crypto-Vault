@@ -220,4 +220,4 @@ vault_history.log
 
 build/
 dist/
-*.spec
+*.specvault_config.json
